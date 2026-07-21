@@ -26,6 +26,8 @@ Git is recommended locally for rollback. GitHub is optional for terminal-assiste
 - Idempotent seed command
 - README deployment section
 
+`requirements.txt` must include `tzdata` so `zoneinfo.ZoneInfo("Africa/Kigali")` works during Windows local development as well as deployment.
+
 ## Environment variables
 
 Required:
@@ -42,6 +44,8 @@ APP_ENV=production
 SESSION_COOKIE_SECURE=true
 ```
 
+The application timezone is fixed to `Africa/Kigali`. Use it for all application date calculations, public daily schedules, reminders, and planning-window calculations. Keep PostgreSQL timestamps timezone-aware.
+
 Never commit `.env`, passwords, secret keys, Render credentials, or OpenCode credentials.
 
 ## PostgreSQL URL
@@ -50,7 +54,7 @@ Normalize the provider URL only when required by the installed SQLAlchemy/Postgr
 
 ## Production server
 
-Use Gunicorn, not Flask’s development server.
+Use Gunicorn, not Flask's development server.
 
 A common application-factory start command is:
 
@@ -88,14 +92,20 @@ OpenCode must not expose or commit secrets.
 
 - Public page loads
 - Current date is correct
+- `ZoneInfo("Africa/Kigali")` loads successfully
 - Login works
 - Disabled user cannot log in
 - Teacher can submit
 - Monitor can submit
 - Queue count updates
-- Patron/Matron can schedule
+- Patron/Matron (`SCHEDULER`) can initially approve and schedule Pending requests
+- Administrator cannot initially approve or schedule Pending requests
+- Administrator and Patron/Matron can reschedule or cancel existing Scheduled bookings
 - Conflicts are blocked
-- Today’s booking appears publicly
+- Blocks fail when an active Scheduled booking exists in their scope
+- Simultaneous scheduling and blocking attempts on the same date cannot both commit when they conflict
+- Current-date and three-day-window behavior uses Africa/Kigali
+- Today's booking appears publicly
 - Notifications appear
 - Admin pages are protected
 - Error pages work

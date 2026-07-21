@@ -7,7 +7,7 @@ Use PostgreSQL with SQLAlchemy and Flask-Migrate/Alembic.
 ## Enumerations
 
 ```text
-UserRole: ADMIN, MATRON, TEACHER, MONITOR
+UserRole: ADMIN, SCHEDULER, TEACHER, MONITOR
 RequestPriority: HIGH, NORMAL
 RequestStatus: PENDING, SCHEDULED, REJECTED, CANCELLED
 PrepPeriod: PREP_1, PREP_2
@@ -16,6 +16,12 @@ NotificationType: APPROVED, REJECTED, RESCHEDULED, CANCELLED, PASSWORD_RESET, SY
 ```
 
 Use either PostgreSQL enums or validated strings consistently.
+
+`SCHEDULER` has the user-facing label Patron/Matron. Only `SCHEDULER` may initially approve and schedule a Pending request. `ADMIN` and `SCHEDULER` may reschedule or cancel an existing Scheduled booking, but `ADMIN` must not initially schedule a Pending request.
+
+Use `Africa/Kigali` for application date calculations, the public daily schedule, reminders, and planning-window calculations. Database timestamp columns remain timezone-aware.
+
+Include the Python `tzdata` package in `requirements.txt` so `zoneinfo.ZoneInfo("Africa/Kigali")` also works in Windows local development. Add a test that loads this zone successfully.
 
 ## Tables
 
@@ -150,6 +156,14 @@ Scope rules:
 - ROOM_DAY: room required, prep null
 - DAY: room and prep null
 
+A new block must be rejected if any active Scheduled booking falls within its scope:
+
+- SLOT conflicts with the same date, room, and prep.
+- ROOM_DAY conflicts with any active booking for that date and room.
+- DAY conflicts with any active booking on that date.
+
+The authorized user must reschedule or cancel affected bookings first. Creating a block never cancels or overwrites a booking.
+
 ### notifications
 
 | Column | Type | Rules |
@@ -217,24 +231,40 @@ Scheduling, rejection, or pending cancellation:
 ## Scheduling transaction
 
 1. Lock Pending request.
-2. Validate planning-window date.
-3. Confirm class, teacher, and room are active.
-4. Check active blocks.
-5. Insert ScheduledBooking.
-6. Let unique indexes prevent race-condition conflicts.
-7. Change request to Scheduled.
-8. Create notification and audit log.
-9. Update queue lock state.
-10. Commit or roll back everything.
+2. Confirm the actor has role `SCHEDULER`; `ADMIN` cannot initially schedule a Pending request.
+3. Validate that the date is the current `Africa/Kigali` date or one of the next two calendar dates.
+4. Allow same-day scheduling without a time cutoff.
+5. Acquire the shared PostgreSQL transaction-level advisory lock for the target schedule date.
+6. Confirm class, teacher, and room are active.
+7. Check bookings, active blocks, and all conflicts.
+8. Insert ScheduledBooking.
+9. Let partial unique indexes prevent final room, class, and teacher booking conflicts.
+10. Change request to Scheduled.
+11. Create notification and audit log.
+12. Update queue lock state.
+13. Commit or roll back everything.
 
 ## Rescheduling transaction
 
 1. Lock scheduled booking.
-2. Validate target date, prep, room, and blocks.
-3. Update schedule.
-4. Let unique indexes verify availability.
-5. Create notification and audit log.
-6. Commit.
+2. Confirm the actor has role `ADMIN` or `SCHEDULER`.
+3. Validate the target date against the current `Africa/Kigali` date plus the next two calendar dates; same-day rescheduling has no time cutoff.
+4. Acquire the shared advisory locks for the old and target schedule dates in chronological order, acquiring only one lock when the date is unchanged.
+5. Validate prep and room, then check bookings, blocks, and all conflicts.
+6. Update schedule.
+7. Let partial unique indexes verify final room, class, and teacher availability.
+8. Create notification and audit log.
+9. Commit.
+
+## Date advisory-lock protocol
+
+Scheduling, rescheduling, cancellation of a Scheduled booking, block creation, and block removal must acquire the same PostgreSQL transaction-level advisory lock keyed deterministically by every affected schedule date. Use one shared date-to-lock-key function for all five operations. The key must depend only on the date, not on room, prep, operation type, table, or process-local hashing.
+
+Acquire date locks before reading or checking Scheduled bookings, room blocks, or conflicts. If an operation affects more than one date, acquire locks in chronological order to prevent deadlocks. Transaction-level locks must be released automatically on commit or rollback.
+
+This protocol is required because `scheduled_bookings` and `room_blocks` are separate tables; booking partial unique indexes cannot prevent a concurrent booking and block from both passing their checks. Keep the existing active room, class, and teacher partial unique indexes as the final defense against booking-to-booking conflicts.
+
+Cancellation of a Scheduled booking must lock its schedule date before checking or changing date availability. Block creation and block removal must lock `block_date` before checking bookings, blocks, or conflicts. Add transactional concurrency tests that start scheduling and blocking attempts simultaneously on the same date and prove that conflicting operations cannot both commit.
 
 ## Data retention
 

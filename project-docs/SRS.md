@@ -3,15 +3,19 @@
 ## Software Requirements Specification
 
 **Version:** 1.0  
-**Institution:** College Saint André  
+**Institution:** College Saint Andre
 **Application type:** Web-based booking and scheduling system  
 **Stack:** Python, Flask, Jinja2, Bootstrap 5, SQLAlchemy, PostgreSQL, Flask-Migrate, Gunicorn, Render
+
+The required Python dependencies include `tzdata` so `zoneinfo.ZoneInfo("Africa/Kigali")` loads reliably during Windows local development.
 
 ## 1. Purpose
 
 SCMS digitizes Smart Class requests, scheduling, conflict prevention, notifications, reports, and the public daily timetable.
 
 Teachers and class monitors submit requests without selecting a date, prep, or room. The Patron/Matron assigns those values during approval.
+
+The four authenticated internal roles are `ADMIN`, `SCHEDULER`, `TEACHER`, and `MONITOR`. The user-facing label for `SCHEDULER` is Patron/Matron.
 
 ## 2. Design principles
 
@@ -58,24 +62,28 @@ Excluded:
 
 ## 4. Roles
 
-### Administrator
+### Administrator (`ADMIN`)
 
 - Create, edit, disable, and reset user accounts
 - Assign roles
 - Manage classes and rooms
-- View and modify schedules
+- Reschedule or cancel existing Scheduled bookings
 - Block/unblock slots
 - View reports and audit logs
 
-### Patron/Matron
+Administrators must not initially approve or schedule Pending requests.
+
+### Patron/Matron (`SCHEDULER`)
 
 - View pending requests
 - See teacher requests first with a High Priority badge
-- Schedule, reject, reschedule, and cancel
+- Initially approve and schedule Pending requests
+- Reject Pending requests
+- Reschedule and cancel Scheduled bookings
 - Block/unblock slots, rooms, or entire days
 - View reports and scheduling reminders
 
-### Teacher
+### Teacher (`TEACHER`)
 
 - Submit request
 - Choose class
@@ -85,7 +93,7 @@ Excluded:
 
 Teacher requests are High Priority.
 
-### Class Monitor
+### Class Monitor (`MONITOR`)
 
 - Submit request for the class assigned to the account
 - Select responsible teacher
@@ -97,7 +105,7 @@ Monitor requests are Normal Priority.
 
 ### Public user
 
-No login. Can see only today’s approved schedule:
+No login. Can see only today's approved schedule:
 
 - Class
 - Smart Class room
@@ -168,7 +176,7 @@ Teacher is automatically the logged-in user.
 - Subject
 - Private reason
 
-Class is automatically the monitor’s assigned class.
+Class is automatically the monitor's assigned class.
 
 Users never choose:
 
@@ -218,6 +226,12 @@ The system shows:
 - Remaining daily capacity
 - Priority queue
 
+The window is the current date plus the next two calendar dates. For example, if the current date is Monday, the window is Monday, Tuesday, and Wednesday. It rolls forward automatically at midnight in the `Africa/Kigali` timezone.
+
+Weekends and holidays are not automatically excluded in version 1. When Smart Classes are unavailable, the Patron/Matron may block the entire day.
+
+Same-day scheduling and rescheduling are allowed. There is no automatic time cutoff because exact prep start and end times are not stored.
+
 The system does not automatically reserve all three days. Unused slots remain available.
 
 ## 11. Blocking
@@ -230,7 +244,11 @@ Only Patron/Matron or Admin can block:
 
 Blocks may have an internal reason and must be audited. They can be removed by authorized users.
 
+Creating a block must fail if its exact slot, room-day, or full-day scope contains any active Scheduled booking. The Patron/Matron or Administrator must first reschedule or cancel every affected booking. Blocking must never silently cancel or overwrite a booking.
+
 ## 12. Scheduling workflow
+
+Only the Patron/Matron (`SCHEDULER`) may perform initial approval and scheduling of a Pending request. `ADMIN` must not perform this action.
 
 1. Confirm request is still Pending.
 2. Confirm date is inside planning window.
@@ -255,13 +273,15 @@ Reject schedules causing:
 
 Application checks must be backed by PostgreSQL constraints where possible.
 
+Scheduling, rescheduling, cancellation of Scheduled bookings, block creation, and block removal must use the same PostgreSQL transaction-level advisory lock derived deterministically from each affected schedule date. Acquire the date lock before checking bookings, blocks, or conflicts. When an operation affects two dates, acquire both date locks in chronological order. This serializes booking and block changes that span separate tables. Keep the room, class, and teacher partial unique indexes as the final booking-conflict defense.
+
 ## 14. Rejection
 
 Patron/Matron may reject a Pending request with a reason. The request leaves the queue, the requester is notified, queue state is recalculated, and an audit log is created.
 
 ## 15. Rescheduling
 
-Only Patron/Matron or Admin can reschedule. They choose a new date, prep, and room. All conflict rules run again. The user receives a Booking Changed notification.
+Only Patron/Matron (`SCHEDULER`) or Administrator (`ADMIN`) can reschedule an existing Scheduled booking. They choose a new date, prep, and room. All conflict rules run again. The user receives a Booking Changed notification.
 
 ## 16. Cancellation
 
@@ -271,7 +291,7 @@ Only Patron/Matron or Admin can reschedule. They choose a new date, prep, and ro
 
 ## 17. Public schedule
 
-The public route automatically filters by the current date and shows:
+The public route automatically filters by the current date in `Africa/Kigali` and shows:
 
 - Prep
 - Room
@@ -289,7 +309,7 @@ Users receive:
 - Booking changed
 - Booking cancelled
 
-Patron/Matron dashboard shows a reminder to prepare tomorrow’s schedule using pending count, tomorrow’s capacity, and tomorrow’s existing schedule.
+Patron/Matron dashboard shows a reminder to prepare tomorrow's schedule using pending count, tomorrow's capacity, and tomorrow's existing schedule. All reminder dates use `Africa/Kigali`.
 
 ## 19. Reports
 
@@ -339,6 +359,10 @@ Each log records actor, action, entity, timestamp, and structured details.
 - Use transactions for queue, scheduling, rescheduling, rejection, and cancellation.
 - Preserve historical records.
 - Prefer archive/disable over hard deletion.
+- Use `Africa/Kigali` for all application date calculations, public daily schedules, reminders, and planning-window calculations.
+- Keep database timestamps timezone-aware.
+- Test that `ZoneInfo("Africa/Kigali")` loads successfully.
+- Test simultaneous scheduling and blocking attempts on the same date; exactly one conflicting operation may succeed.
 
 ## 24. Deployment
 
@@ -374,7 +398,7 @@ Version 1 is accepted when:
 10. All conflicts are prevented.
 11. Rescheduling is safe and transactional.
 12. Notifications work.
-13. Public page shows only today’s schedule.
+13. Public page shows only today's schedule.
 14. Reports are correct.
 15. Unauthorized access is blocked.
 16. App runs on PostgreSQL with Gunicorn and Render.

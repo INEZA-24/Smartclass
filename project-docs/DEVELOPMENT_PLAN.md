@@ -27,7 +27,7 @@ Before deployment:
 bandit -r app
 ```
 
-## Milestone 0 — Documentation lock
+## Milestone 0 - Documentation lock
 
 Deliverables:
 
@@ -41,7 +41,7 @@ Deliverables:
 
 Gate: no unresolved business-logic questions.
 
-## Milestone 1 — Flask scaffold
+## Milestone 1 - Flask scaffold
 
 Deliverables:
 
@@ -52,7 +52,13 @@ Deliverables:
 - SQLAlchemy, Flask-Migrate, Flask-Login, Flask-WTF
 - Testing setup
 - Gunicorn entry point
-- Environment example
+- `requirements.txt`
+- `tzdata` included in `requirements.txt` for Windows `ZoneInfo` support
+- `.gitignore`
+- `.env.example`
+- pytest setup
+- Ruff setup
+- No booking logic
 
 Gate:
 
@@ -60,10 +66,11 @@ Gate:
 - Test route works
 - No secrets committed
 - Tests and lint pass
+- `ZoneInfo("Africa/Kigali")` test passes
 
 Suggested commit: `chore: scaffold Flask application`
 
-## Milestone 2 — Database and seed data
+## Milestone 2 - Database and seed data
 
 Deliverables:
 
@@ -81,7 +88,7 @@ Gate:
 
 Suggested commit: `feat: add core database schema`
 
-## Milestone 3 — Authentication and authorization
+## Milestone 3 - Authentication and authorization
 
 Deliverables:
 
@@ -100,7 +107,7 @@ Gate:
 
 Suggested commit: `feat: implement authentication and roles`
 
-## Milestone 4 — Admin management
+## Milestone 4 - Admin management
 
 Deliverables:
 
@@ -118,7 +125,7 @@ Gate:
 
 Suggested commit: `feat: add admin management`
 
-## Milestone 5 — Requests and queue
+## Milestone 5 - Requests and queue
 
 Deliverables:
 
@@ -140,15 +147,20 @@ Gate:
 
 Suggested commit: `feat: add booking requests and queue control`
 
-## Milestone 6 — Scheduler and blocks
+## Milestone 6 - Scheduler and blocks
 
 Deliverables:
 
 - Rolling three-day window
+- Africa/Kigali date handling: current date plus the next two calendar dates, rolling at midnight
+- Same-day scheduling with no automatic time cutoff
+- Weekends and holidays included unless manually blocked
 - Slot grid
 - Schedule request
 - Slot, room-day, and full-day blocking
+- Block creation rejected when its scope contains an active Scheduled booking
 - Conflict prevention
+- Shared deterministic PostgreSQL transaction-level advisory lock by schedule date for scheduling and block mutations
 - Notifications
 - Audit logs
 
@@ -156,30 +168,34 @@ Gate:
 
 - All conflict tests pass
 - Blocked slots cannot be scheduled
+- Blocks cannot overwrite or silently cancel active bookings
 - Concurrent attempts cannot double-book
+- Simultaneous scheduling and blocking on the same date cannot both commit when they conflict
 
 Suggested commit: `feat: add schedule builder and slot blocking`
 
-## Milestone 7 — Rejection and schedule changes
+## Milestone 7 - Rejection and schedule changes
 
 Deliverables:
 
 - Rejection
 - Rescheduling
 - Scheduled cancellation
+- Shared date advisory locks for rescheduling and Scheduled-booking cancellation
 - Queue-state recalculation
 - Notifications and logs
 
 Gate:
 
 - Rescheduling transactional
+- Date locks are acquired before booking, block, or conflict checks
 - Old slot available
 - New conflicts prevented
 - History preserved
 
 Suggested commit: `feat: add rejection and rescheduling workflows`
 
-## Milestone 8 — Public schedule and notifications
+## Milestone 8 - Public schedule and notifications
 
 Deliverables:
 
@@ -196,7 +212,7 @@ Gate:
 
 Suggested commit: `feat: publish daily schedule and notifications`
 
-## Milestone 9 — Reports
+## Milestone 9 - Reports
 
 Deliverables:
 
@@ -214,7 +230,7 @@ Gate:
 
 Suggested commit: `feat: add booking reports`
 
-## Milestone 10 — UI polish
+## Milestone 10 - UI polish
 
 Deliverables:
 
@@ -233,7 +249,7 @@ Gate:
 
 Suggested commit: `style: polish responsive user interface`
 
-## Milestone 11 — Deployment
+## Milestone 11 - Deployment
 
 Deliverables:
 
@@ -253,7 +269,7 @@ Gate:
 
 Suggested commit: `chore: prepare Render deployment`
 
-## Milestone 12 — Portfolio packaging
+## Milestone 12 - Portfolio packaging
 
 Deliverables:
 

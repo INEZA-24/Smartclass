@@ -20,6 +20,10 @@ Rules:
 8. Never hard-code secrets.
 9. Add or update tests for every business rule.
 10. At the end, report files changed, migrations, commands, tests, and risks.
+11. Use internal roles ADMIN, SCHEDULER, TEACHER, and MONITOR; display SCHEDULER as Patron/Matron.
+12. Only SCHEDULER initially approves and schedules Pending requests. ADMIN and SCHEDULER may reschedule or cancel Scheduled bookings.
+13. Use Africa/Kigali for all application date calculations while keeping database timestamps timezone-aware.
+14. For scheduling, rescheduling, Scheduled-booking cancellation, block creation, and block removal, acquire the shared deterministic PostgreSQL transaction-level advisory lock for each affected date before checking bookings, blocks, or conflicts.
 Do not begin unrelated milestones.
 ```
 
@@ -28,7 +32,7 @@ Do not begin unrelated milestones.
 ```text
 Implement only Milestone 1 from project-docs/DEVELOPMENT_PLAN.md.
 
-Create the Flask scaffold with application factory, configuration, SQLAlchemy, Flask-Migrate, Flask-Login, Flask-WTF, Bootstrap templates, blueprints, pytest, Ruff, .env.example, .gitignore, requirements.txt, and a Gunicorn-compatible entry point.
+Create the Flask scaffold with application factory, configuration, SQLAlchemy, Flask-Migrate, Flask-Login, Flask-WTF, Bootstrap templates, blueprints, pytest setup, Ruff setup, .env.example, .gitignore, requirements.txt, and a Gunicorn-compatible entry point. Include `tzdata` in requirements.txt for Windows support and add a test proving `ZoneInfo("Africa/Kigali")` loads.
 
 Do not implement booking logic.
 ```
@@ -83,11 +87,11 @@ Test maximum 12, locked at 11 and 10, unlock at 9, and edit/cancel only while Pe
 ## 6. Scheduler and blocking
 
 ```text
-Implement the Patron/Matron scheduler only.
+Implement the Patron/Matron (`SCHEDULER`) scheduler only. Only SCHEDULER may initially approve and schedule Pending requests; ADMIN must not do so.
 
-Add rolling three-day window, priority ordering, six calculated slots per full day, Available/Booked/Unavailable states, single-slot blocks, room-day blocks, full-day blocks, unblocking, and scheduling.
+Add a rolling window consisting of the current Africa/Kigali date plus the next two calendar dates. Roll it forward at midnight in that timezone. Allow same-day scheduling without a time cutoff. Do not automatically exclude weekends or holidays. Add priority ordering, six calculated slots per full day, Available/Booked/Unavailable states, single-slot blocks, room-day blocks, full-day blocks, unblocking, and scheduling.
 
-Enforce room, class, teacher, and block conflicts in one transaction. Create notifications and audit logs. Test every conflict and block scope.
+Enforce room, class, teacher, and block conflicts in one transaction. Scheduling and block creation or removal must acquire the same deterministic PostgreSQL transaction-level advisory lock for the affected date before checking bookings, blocks, or conflicts. Reject any block whose scope contains an active Scheduled booking; never cancel or overwrite bookings implicitly. Keep booking partial unique indexes as the final booking-conflict defense. Create notifications and audit logs. Test every conflict and block scope, including simultaneous scheduling and blocking attempts on the same date.
 ```
 
 ## 7. Rejection, rescheduling, cancellation
@@ -95,9 +99,9 @@ Enforce room, class, teacher, and block conflicts in one transaction. Create not
 ```text
 Implement rejection, rescheduling, and cancellation only.
 
-Patron/Matron rejects Pending requests with a reason. Requesters cancel Pending requests. Patron/Matron and Admin reschedule or cancel Scheduled bookings.
+Patron/Matron (`SCHEDULER`) rejects Pending requests with a reason. Requesters cancel Pending requests. SCHEDULER and ADMIN reschedule or cancel Scheduled bookings. Same-day rescheduling is allowed without a time cutoff.
 
-Apply all conflict checks again, recalculate queue state, and create notifications and audit logs. Add transactional tests.
+For rescheduling, acquire the shared date advisory locks for the old and target dates in chronological order before conflict checks. For Scheduled-booking cancellation, acquire the same lock for its date before checking or changing availability. Apply all conflict checks again, recalculate queue state, and create notifications and audit logs. Add transactional tests.
 ```
 
 ## 8. Public schedule and notifications
@@ -105,7 +109,7 @@ Apply all conflict checks again, recalculate queue state, and create notificatio
 ```text
 Implement the public current-day schedule and notification center only.
 
-Public page shows prep, room, class, and teacher. Hide subject, reason, priority, and internal notes. Add an empty state.
+Public page uses the current Africa/Kigali date and shows prep, room, class, and teacher. Hide subject, reason, priority, and internal notes. Add an empty state.
 
 Add notification list, unread count, mark one read, and mark all read. Test date filtering and private-data exposure.
 ```
