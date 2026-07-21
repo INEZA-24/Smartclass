@@ -13,6 +13,7 @@ from app.blueprints.public import bp as public_bp
 from app.blueprints.requester import bp as requester_bp
 from app.blueprints.scheduler import bp as scheduler_bp
 from app.extensions import csrf, db, login_manager, migrate
+from app.seed import seed_command
 from config import apply_runtime_environment, config_by_name, normalize_database_url
 
 
@@ -41,6 +42,9 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
+    app.cli.add_command(seed_command)
+
+    from app import models  # noqa: F401
 
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
