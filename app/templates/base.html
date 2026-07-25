@@ -15,9 +15,24 @@
     <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="dark">
       <div class="container">
         <a class="navbar-brand" href="{{ url_for('public.home') }}">SCMS</a>
+        <div class="ms-auto d-flex align-items-center gap-3 text-white">
+          {% if current_user.is_authenticated %}
+            <a class="nav-link" href="{{ dashboard_url() }}">Dashboard</a>
+            <span>{{ current_user.full_name }}</span>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
+            </form>
+          {% else %}
+            <a class="nav-link" href="{{ url_for('auth.login') }}">Login</a>
+          {% endif %}
+        </div>
       </div>
     </nav>
     <main class="container py-5">
+      {% for category, message in get_flashed_messages(with_categories=true) %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
       {% block content %}{% endblock %}
     </main>
     <script

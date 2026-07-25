@@ -2,9 +2,11 @@
 
 from datetime import UTC, datetime
 
+from flask_login import UserMixin
 from sqlalchemy import JSON, BigInteger, CheckConstraint, Enum, Index, event, inspect
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, validates
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
 from app.models.enums import (
@@ -54,7 +56,7 @@ class Room(TimestampMixin, db.Model):
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
 
-class User(TimestampMixin, db.Model):
+class User(UserMixin, TimestampMixin, db.Model):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint(
@@ -72,6 +74,14 @@ class User(TimestampMixin, db.Model):
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     must_change_password = db.Column(db.Boolean, nullable=False, default=True)
     school_class = db.relationship("SchoolClass", backref="monitors")
+
+    def set_password(self, password: str) -> None:
+        """Store a secure hash of a password."""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        """Verify a password against its stored hash."""
+        return check_password_hash(self.password_hash, password)
 
     @validates("role", "class_id")
     def validate_class_assignment(self, key, value):

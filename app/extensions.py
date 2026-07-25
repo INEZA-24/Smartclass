@@ -12,6 +12,11 @@ csrf = CSRFProtect()
 
 
 @login_manager.user_loader
-def load_user(_user_id: str):
-    """Return no user until authentication is implemented in Milestone 3."""
-    return None
+def load_user(user_id: str):
+    """Load active users for Flask-Login sessions."""
+    from app.models import User
+
+    if not user_id.isdigit():
+        return None
+    user = db.session.get(User, int(user_id), populate_existing=True)
+    return user if user is not None and user.is_active else None

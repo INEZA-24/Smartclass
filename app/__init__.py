@@ -5,14 +5,17 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from flask import Flask
+from flask import Flask, redirect, render_template, request, url_for
+from flask_login import current_user, logout_user
 
+from app.authz import dashboard_url
 from app.blueprints.admin import bp as admin_bp
 from app.blueprints.auth import bp as auth_bp
 from app.blueprints.public import bp as public_bp
 from app.blueprints.requester import bp as requester_bp
 from app.blueprints.scheduler import bp as scheduler_bp
 from app.extensions import csrf, db, login_manager, migrate
+from app.models import User
 from app.seed import seed_command
 from config import apply_runtime_environment, config_by_name, normalize_database_url
 
@@ -41,6 +44,7 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
     csrf.init_app(app)
     app.cli.add_command(seed_command)
 
@@ -51,5 +55,28 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(scheduler_bp, url_prefix="/scheduler")
     app.register_blueprint(requester_bp, url_prefix="/requester")
+    app.jinja_env.globals["dashboard_url"] = dashboard_url
+
+    @app.before_request
+    def enforce_temporary_password_change():
+        if current_user.is_authenticated:
+            user = db.session.get(
+                User, int(current_user.get_id()), populate_existing=True
+            )
+            if user is None or not user.is_active:
+                logout_user()
+                return redirect(url_for("auth.login"))
+        allowed = {"auth.change_password", "auth.logout", "static"}
+        if (
+            current_user.is_authenticated
+            and current_user.must_change_password
+            and request.endpoint not in allowed
+        ):
+            return redirect(url_for("auth.change_password"))
+        return None
+
+    @app.errorhandler(403)
+    def forbidden(_error):
+        return render_template("errors/403.html"), 403
 
     return app

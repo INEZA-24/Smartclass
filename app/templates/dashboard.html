@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ role_label }} Dashboard | SCMS{% endblock %}
+{% block content %}
+<div class="card shadow-sm"><div class="card-body p-4">
+  <h1 class="h3">{{ role_label }} Dashboard</h1>
+  <p class="mb-0">Welcome, {{ user.full_name }}.</p>
+</div></div>
+{% endblock %}
