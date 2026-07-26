@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Administration | SCMS{% endblock %}
+{% block content %}
+  <h1 class="mb-4">Administration</h1>
+  <div class="row g-3 mb-4">
+    {% for label, value in [
+      ("Active users", active_users),
+      ("Inactive users", inactive_users),
+      ("Active classes", active_classes),
+      ("Active rooms", active_rooms)
+    ] %}
+      <div class="col-sm-6 col-xl-3">
+        <div class="card h-100"><div class="card-body">
+          <div class="text-secondary">{{ label }}</div>
+          <div class="display-6">{{ value }}</div>
+        </div></div>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-primary" href="{{ url_for('admin.users') }}">Manage users</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.classes') }}">Manage classes</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.rooms') }}">Manage rooms</a>
+  </div>
+{% endblock %}
