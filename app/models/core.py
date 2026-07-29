@@ -274,17 +274,30 @@ def validate_models(_session, _context, _instances):
                 obj.apply_requester_rules()
             else:
                 state = inspect(obj)
-                immutable = (
-                    "requester_id",
-                    "class_id",
-                    "teacher_id",
-                    "priority",
-                    "requester",
-                    "school_class",
-                    "teacher",
-                )
-                if any(state.attrs[name].history.has_changes() for name in immutable):
+                always_immutable = ("requester_id", "priority", "requester")
+                if any(
+                    state.attrs[name].history.has_changes() for name in always_immutable
+                ):
                     raise ValueError("Persisted request identity fields are immutable")
+
+                class_changed = any(
+                    state.attrs[name].history.has_changes()
+                    for name in ("class_id", "school_class")
+                )
+                teacher_changed = any(
+                    state.attrs[name].history.has_changes()
+                    for name in ("teacher_id", "teacher")
+                )
+                status_changed = state.attrs.status.history.has_changes()
+                remains_pending = (
+                    not status_changed and obj.status == RequestStatus.PENDING
+                )
+                teacher_origin = obj.priority == RequestPriority.HIGH
+                monitor_origin = obj.priority == RequestPriority.NORMAL
+                if class_changed and not (remains_pending and teacher_origin):
+                    raise ValueError("This request class is immutable")
+                if teacher_changed and not (remains_pending and monitor_origin):
+                    raise ValueError("This request teacher is immutable")
         elif isinstance(obj, RoomBlock):
             has_room = obj.room_id is not None or obj.room is not None
             if obj.scope == BlockScope.SLOT and (not has_room or obj.prep is None):

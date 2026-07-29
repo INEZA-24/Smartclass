@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Pending Queue | SCMS{% endblock %}
+{% block content %}
+  <h1>Pending queue</h1>
+  {% if settings %}<div class="alert alert-info">Pending: {{ pending_count }}/{{ settings.max_pending_requests }} — {{ "Locked" if settings.booking_queue_locked else "Open" }}</div>{% endif %}
+  <div class="table-responsive"><table class="table table-striped"><thead><tr><th>Requester</th><th>Role</th><th>Class</th><th>Teacher</th><th>Subject</th><th>Private reason</th><th>Priority</th><th>Created</th></tr></thead><tbody>
+  {% for item in requests %}<tr><td>{{ item.requester.full_name }}</td><td>{{ origin_labels[item.id] }}</td><td>{{ item.school_class.name }}</td><td>{{ item.teacher.full_name }}</td><td>{{ item.subject }}</td><td>{{ item.reason }}</td><td>{{ item.priority.value }}</td><td>{{ item.created_at }}</td></tr>{% else %}<tr><td colspan="8" class="text-center">No pending requests.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

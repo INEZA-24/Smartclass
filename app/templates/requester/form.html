@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if editing else "New" }} Request | SCMS{% endblock %}
+{% block content %}
+  <h1>{{ "Edit" if editing else "New" }} booking request</h1>
+  {% if settings %}
+    <div class="alert alert-{{ 'warning' if settings.booking_queue_locked else 'info' }}">
+      Pending: {{ pending_count }}/{{ settings.max_pending_requests }} —
+      {{ "Temporarily locked; submissions reopen at 9 or fewer." if settings.booking_queue_locked else "Submissions open." }}
+    </div>
+  {% endif %}
+  {% if editing or (settings and not settings.booking_queue_locked) %}
+    <form method="post" class="card card-body">
+      {{ form.hidden_tag() }}
+      {% if form.class_id is defined %}
+        <div class="mb-3">{{ form.class_id.label(class="form-label") }}{{ form.class_id(class="form-select") }}{% for error in form.class_id.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
+      {% endif %}
+      {% if form.teacher_id is defined %}
+        <div class="mb-3">{{ form.teacher_id.label(class="form-label") }}{{ form.teacher_id(class="form-select") }}{% for error in form.teacher_id.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
+      {% endif %}
+      <div class="mb-3">{{ form.subject.label(class="form-label") }}{{ form.subject(class="form-control") }}{% for error in form.subject.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
+      <div class="mb-3">{{ form.reason.label(class="form-label") }}{{ form.reason(class="form-control", rows=4) }}{% for error in form.reason.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
+      {{ form.submit(class="btn btn-primary") }}
+    </form>
+  {% endif %}
+{% endblock %}

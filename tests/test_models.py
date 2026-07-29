@@ -128,7 +128,7 @@ def test_monitor_class_change_does_not_rewrite_historical_request(app):
 
 
 @pytest.mark.parametrize(
-    "attribute", ["requester_id", "class_id", "teacher_id", "priority"]
+    "attribute", ["requester_id", "teacher_id", "priority"]
 )
 def test_persisted_request_identity_is_immutable(app, attribute):
     with app.app_context():
