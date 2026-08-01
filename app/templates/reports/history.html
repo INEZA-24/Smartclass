@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Booking History | SCMS{% endblock %}
+{% block content %}
+  <a href="{{ url_for('reports.index') }}">Back to Reports</a><h1 class="mt-2">Booking History</h1>
+  <form method="get" class="row g-3 align-items-end mb-4">
+    <div class="col-md-3"><label class="form-label" for="start_date">Start date</label><input class="form-control" type="date" id="start_date" name="start_date" value="{{ filters.values.start_date.isoformat() if filters.values.start_date else '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="end_date">End date</label><input class="form-control" type="date" id="end_date" name="end_date" value="{{ filters.values.end_date.isoformat() if filters.values.end_date else '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="status">Status</label><select class="form-select" id="status" name="status"><option value="">All statuses</option>{% for status in statuses %}<option value="{{ status.value }}"{% if filters.values.status == status %} selected{% endif %}>{{ status.value.title() }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label" for="origin">Requester origin</label><select class="form-select" id="origin" name="origin"><option value="">All origins</option><option value="TEACHER"{% if filters.values.origin and filters.values.origin.value == 'HIGH' %} selected{% endif %}>Teacher</option><option value="MONITOR"{% if filters.values.origin and filters.values.origin.value == 'NORMAL' %} selected{% endif %}>Class Monitor</option></select></div>
+    <div class="col-md-4"><label class="form-label" for="room_id">Room</label><select class="form-select" id="room_id" name="room_id"><option value="">All rooms</option>{% for room in rooms %}<option value="{{ room.id }}"{% if filters.values.room_id == room.id %} selected{% endif %}>{{ room.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><label class="form-label" for="class_id">Class</label><select class="form-select" id="class_id" name="class_id"><option value="">All classes</option>{% for item in classes %}<option value="{{ item.id }}"{% if filters.values.class_id == item.id %} selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></div>
+    <div class="col-auto"><button class="btn btn-primary">Apply filters</button></div>
+  </form>
+  {% for error in filters.errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+  {% if not filters.valid %}
+    <p class="alert alert-secondary">Correct the filters above to run this report.</p>
+  {% else %}
+    <p><strong>Total requests:</strong> {{ rows|length }}</p>
+    {% if rows %}
+    <div class="table-responsive"><table class="table table-striped">
+      <thead><tr>
+        {% for heading in ('Request', 'Submitted', 'Requester', 'Origin', 'Class', 'Teacher', 'Subject', 'Priority', 'Status', 'Current schedule', 'Booking state', 'Request cancelled', 'Booking cancelled') %}
+          <th scope="col">{{ heading }}</th>
+        {% endfor %}
+      </tr></thead>
+      <tbody>{% for row in rows %}<tr><td>#{{ row.id }}</td><td>{{ display_kigali(row.created_at).strftime('%Y-%m-%d %H:%M') }}</td><td>{{ row.requester_name }}</td><td>{{ origin_labels[row.priority] }}</td><td>{{ row.class_name }}</td><td>{{ row.teacher_name }}</td><td>{{ row.subject }}</td><td><span class="badge text-bg-secondary">{{ row.priority.value.title() }}</span></td><td><span class="badge text-bg-secondary">{{ row.status.value.title() }}</span></td><td>{% if row.schedule_date %}{{ row.schedule_date }} / {{ prep_labels[row.prep] }} / {{ row.room_name or 'Unavailable' }}{% else %}Not scheduled{% endif %}</td><td>{% if row.booking_active is sameas true %}Active{% elif row.booking_active is sameas false %}Cancelled{% else %}Not scheduled{% endif %}</td><td>{{ display_kigali(row.request_cancelled_at).strftime('%Y-%m-%d %H:%M') if row.request_cancelled_at else 'Not cancelled' }}</td><td>{{ display_kigali(row.booking_cancelled_at).strftime('%Y-%m-%d %H:%M') if row.booking_cancelled_at else 'Not cancelled' }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}
+      <p class="alert alert-info">No booking requests match these filters.</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

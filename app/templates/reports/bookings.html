@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | SCMS{% endblock %}
+{% block content %}
+  <a href="{{ url_for('reports.index') }}">Back to Reports</a>
+  <h1 class="mt-2">{{ title }}</h1>
+  <form method="get" class="row g-3 align-items-end mb-4">
+    <div class="col-sm-6 col-lg-4"><label class="form-label" for="date">{{ 'Anchor date' if title == 'Weekly Bookings' else 'Date' }}</label><input class="form-control" id="date" name="date" type="date" value="{{ date_value.isoformat() if date_value else '' }}"></div>
+    <div class="col-auto"><button class="btn btn-primary" type="submit">Apply filter</button></div>
+  </form>
+  {% for error in filters.errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+  {% if not filters.valid %}
+    <p class="alert alert-secondary">Correct the filters above to run this report.</p>
+  {% else %}
+    {% if range_start %}<p>Week: <strong>{{ range_start }}</strong> through <strong>{{ range_end }}</strong></p>{% else %}<p>Date: <strong>{{ date_value }}</strong></p>{% endif %}
+    <div class="row g-3 mb-4"><div class="col"><div class="card card-body"><strong>Total sessions</strong><span>{{ summary.total }}</span></div></div><div class="col"><div class="card card-body"><strong>Prep 1</strong><span>{{ summary.prep_1 }}</span></div></div><div class="col"><div class="card card-body"><strong>Prep 2</strong><span>{{ summary.prep_2 }}</span></div></div></div>
+    {% if days %}<div class="d-flex flex-wrap gap-2 mb-3">{% for day in days %}<span class="badge text-bg-secondary">{{ day }}: {{ day_counts[day] }}</span>{% endfor %}</div>{% endif %}
+    {% if rows %}
+    <div class="table-responsive"><table class="table table-striped">
+      <thead><tr>
+        {% if days %}<th scope="col">Date</th>{% endif %}
+        <th scope="col">Prep</th><th scope="col">Room</th>
+        <th scope="col">Class</th><th scope="col">Responsible Teacher</th>
+        <th scope="col">Request</th><th scope="col">Origin</th>
+        <th scope="col">Subject</th>
+      </tr></thead>
+      <tbody>{% for row in rows %}<tr>{% if days %}<td>{{ row.schedule_date }}</td>{% endif %}<td>{{ prep_labels[row.prep] }}</td><td>{{ row.room_name }}</td><td>{{ row.class_name }}</td><td>{{ row.teacher_name }}</td><td>#{{ row.request_id }}</td><td>{{ origin_labels[row.priority] }}</td><td>{{ row.subject }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}
+      <p class="alert alert-info">No scheduled sessions match this report.</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

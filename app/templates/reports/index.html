@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Reports | SCMS{% endblock %}
+{% block content %}
+  <h1>Reports</h1>
+  <p class="lead">Read-only Smart Class scheduling reports.</p>
+  <div class="row g-3">
+    {% for endpoint, title, description in [
+      ('reports.daily', 'Daily bookings', 'Sessions scheduled for one date.'),
+      ('reports.weekly', 'Weekly bookings', 'Monday-through-Sunday schedule.'),
+      ('reports.history', 'Booking history', 'Requests in every workflow status.'),
+      ('reports.rooms', 'Room usage', 'Active sessions grouped by room.'),
+      ('reports.classes', 'Class usage', 'Active sessions grouped by class.')
+    ] %}
+      <div class="col-12 col-md-6 col-xl-4"><div class="card h-100"><div class="card-body"><h2 class="h5">{{ title }}</h2><p>{{ description }}</p><a class="btn btn-outline-primary" href="{{ url_for(endpoint) }}">Open report</a></div></div></div>
+    {% endfor %}
+  </div>
+{% endblock %}

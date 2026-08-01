@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | SCMS{% endblock %}
+{% block content %}
+  <a href="{{ url_for('reports.index') }}">Back to Reports</a><h1 class="mt-2">{{ title }}</h1>
+  <form method="get" class="row g-3 align-items-end mb-4">
+    <div class="col-md-3">
+      <label class="form-label" for="start_date">Start date</label>
+      <input class="form-control" type="date" id="start_date" name="start_date" value="{{ filters.values.start_date.isoformat() if filters.values.start_date else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="end_date">End date</label>
+      <input class="form-control" type="date" id="end_date" name="end_date" value="{{ filters.values.end_date.isoformat() if filters.values.end_date else '' }}">
+    </div>
+    <div class="col-md-4"><label class="form-label" for="{{ id_name }}">{{ 'Room' if id_name == 'room_id' else 'Class' }}</label><select class="form-select" id="{{ id_name }}" name="{{ id_name }}"><option value="">All</option>{% for item in choices %}<option value="{{ item.id }}"{% if filters.values[id_name] == item.id %} selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></div>
+    <div class="col-auto"><button class="btn btn-primary">Apply filters</button></div>
+  </form>
+  {% for error in filters.errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+  {% if not filters.valid %}
+    <p class="alert alert-secondary">Correct the filters above to run this report.</p>
+  {% else %}
+    <p><strong>Inclusive range:</strong> {{ filters.values.start_date }} through {{ filters.values.end_date }}</p>
+    <p><strong>Grand total:</strong> {{ grand_total }}</p>
+    {% if rows %}
+    <div class="table-responsive">
+      <table class="table table-striped">
+        <thead><tr>
+          <th scope="col">{{ 'Room' if id_name == 'room_id' else 'Class' }}</th>
+          <th scope="col">Status</th>
+          <th scope="col">Total sessions</th>
+          <th scope="col">Prep 1</th>
+          <th scope="col">Prep 2</th>
+        </tr></thead>
+        <tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ 'Active' if row.is_active else 'Inactive' }}</td><td>{{ row.total }}</td><td>{{ row.prep_1 }}</td><td>{{ row.prep_2 }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="alert alert-info">No usage was recorded for this range.</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

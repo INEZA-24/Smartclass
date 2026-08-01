@@ -13,6 +13,7 @@ from app.blueprints.admin import bp as admin_bp
 from app.blueprints.auth import bp as auth_bp
 from app.blueprints.notifications import bp as notifications_bp
 from app.blueprints.public import bp as public_bp
+from app.blueprints.reports import bp as reports_bp
 from app.blueprints.requester import bp as requester_bp
 from app.blueprints.scheduler import bp as scheduler_bp
 from app.extensions import csrf, db, login_manager, migrate
@@ -52,6 +53,7 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
     from app import models  # noqa: F401
 
     app.register_blueprint(public_bp)
+    app.register_blueprint(reports_bp, url_prefix="/reports")
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(notifications_bp, url_prefix="/notifications")
     app.register_blueprint(admin_bp, url_prefix="/admin")
