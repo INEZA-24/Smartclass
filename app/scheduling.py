@@ -153,19 +153,22 @@ def _locked_active(model, record_id):
     )
 
 
-def _slot_conflict(schedule_date, prep, room_id, class_id, teacher_id):
-    booking = db.session.scalar(
-        db.select(ScheduledBooking.id).where(
-            ScheduledBooking.schedule_date == schedule_date,
-            ScheduledBooking.prep == prep,
-            ScheduledBooking.is_active.is_(True),
-            db.or_(
-                ScheduledBooking.room_id == room_id,
-                ScheduledBooking.class_id == class_id,
-                ScheduledBooking.teacher_id == teacher_id,
-            ),
-        )
+def _slot_conflict(
+    schedule_date, prep, room_id, class_id, teacher_id, excluded_booking_id=None
+):
+    statement = db.select(ScheduledBooking.id).where(
+        ScheduledBooking.schedule_date == schedule_date,
+        ScheduledBooking.prep == prep,
+        ScheduledBooking.is_active.is_(True),
+        db.or_(
+            ScheduledBooking.room_id == room_id,
+            ScheduledBooking.class_id == class_id,
+            ScheduledBooking.teacher_id == teacher_id,
+        ),
     )
+    if excluded_booking_id is not None:
+        statement = statement.where(ScheduledBooking.id != excluded_booking_id)
+    booking = db.session.scalar(statement)
     if booking is not None:
         return True
     return any(
@@ -207,9 +210,7 @@ def schedule_request(request_id, schedule_date, prep, room_id):
             raise SchedulingConflictError(
                 "The selected room, class, or responsible Teacher is inactive."
             )
-        if _slot_conflict(
-            schedule_date, prep, room.id, school_class.id, teacher.id
-        ):
+        if _slot_conflict(schedule_date, prep, room.id, school_class.id, teacher.id):
             raise SchedulingConflictError(
                 "That room, class, or responsible Teacher is unavailable for the slot."
             )
@@ -226,9 +227,7 @@ def schedule_request(request_id, schedule_date, prep, room_id):
         db.session.flush()
         record.status = RequestStatus.SCHEDULED
         count = pending_count()
-        reopened = (
-            settings.booking_queue_locked and count <= settings.reopen_threshold
-        )
+        reopened = settings.booking_queue_locked and count <= settings.reopen_threshold
         if reopened:
             settings.booking_queue_locked = False
         db.session.add(
@@ -274,7 +273,7 @@ def schedule_request(request_id, schedule_date, prep, room_id):
         raise SchedulingConflictError(
             "The requested slot was taken concurrently. Please choose another."
         ) from exc
-    except (SQLAlchemyError, ValueError) as exc:
+    except (SQLAlchemyError, ValueError, TypeError, AttributeError) as exc:
         db.session.rollback()
         raise SchedulingError(
             "Unable to schedule the request. Please try again."
@@ -307,29 +306,22 @@ def create_block(block_date, scope, room_id=None, prep=None, reason=None):
         room = None
         if scope == BlockScope.SLOT:
             if not room_id or prep not in tuple(PrepPeriod):
-                raise SchedulingError(
-                    "A slot block requires an active room and prep."
-                )
+                raise SchedulingError("A slot block requires an active room and prep.")
             room = _locked_active(Room, room_id)
         elif scope == BlockScope.ROOM_DAY:
             if not room_id or prep is not None:
-                raise SchedulingError(
-                    "A room-day block requires only an active room."
-                )
+                raise SchedulingError("A room-day block requires only an active room.")
             room = _locked_active(Room, room_id)
         elif scope == BlockScope.DAY:
             if room_id is not None or prep is not None:
-                raise SchedulingError(
-                    "A full-day block cannot specify a room or prep."
-                )
+                raise SchedulingError("A full-day block cannot specify a room or prep.")
         else:
             raise SchedulingError("Select a valid block scope.")
         if scope != BlockScope.DAY and room is None:
             raise SchedulingError("Select an active room.")
         if _covered_booking_exists(block_date, scope, room_id, prep):
             raise SchedulingConflictError(
-                "The block covers an existing booking. "
-                "Reschedule or cancel it first."
+                "The block covers an existing booking. Reschedule or cancel it first."
             )
         block = RoomBlock(
             block_date=block_date,
@@ -412,3 +404,351 @@ def remove_block(block_id):
         db.session.rollback()
         raise SchedulingError("Unable to remove the block. Please try again.") from exc
     return True, block_date
+
+
+def reject_request(request_id, reason):
+    """Reject one Pending request and update queue hysteresis atomically."""
+    try:
+        if type(request_id) is not int or request_id <= 0:
+            raise SchedulingError("Select a valid request.")
+        actor = lock_actor((UserRole.SCHEDULER,))
+        settings = lock_settings()
+        record = db.session.scalar(
+            db.select(BookingRequest)
+            .where(BookingRequest.id == request_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if record is None:
+            raise SchedulingError("Request not found.")
+        if record.status != RequestStatus.PENDING:
+            db.session.rollback()
+            return False
+        if not isinstance(reason, str):
+            raise SchedulingError("A valid rejection reason is required.")
+        normalized = reason.strip()
+        if not normalized:
+            raise SchedulingError("A rejection reason is required.")
+        if len(normalized) > 2000:
+            raise SchedulingError(
+                "The rejection reason must be 2000 characters or fewer."
+            )
+        record.status = RequestStatus.REJECTED
+        record.rejection_reason = normalized
+        db.session.flush()
+        count = pending_count()
+        reopened = settings.booking_queue_locked and count <= settings.reopen_threshold
+        if reopened:
+            settings.booking_queue_locked = False
+        db.session.add(
+            Notification(
+                user_id=record.requester_id,
+                type=NotificationType.REJECTED,
+                title="Smart Class request rejected",
+                message=(
+                    f"Request {record.id} for {record.school_class.name}: {normalized}"
+                ),
+                booking_request_id=record.id,
+            )
+        )
+        db.session.add(
+            AuditLog(
+                actor_id=actor.id,
+                action="REQUEST_REJECTED",
+                entity_type="BookingRequest",
+                entity_id=record.id,
+                details={
+                    "request_id": record.id,
+                    "status_transition": "PENDING->REJECTED",
+                    "queue_count": count,
+                },
+            )
+        )
+        if reopened:
+            add_queue_audit(actor.id, "QUEUE_REOPENED", count, False)
+        db.session.commit()
+        return True
+    except QueueUnavailableError as exc:
+        db.session.rollback()
+        raise SchedulingError(
+            "System settings are unavailable. Please contact an Administrator."
+        ) from exc
+    except SchedulingError:
+        db.session.rollback()
+        raise
+    except (SQLAlchemyError, ValueError, TypeError, AttributeError) as exc:
+        db.session.rollback()
+        raise SchedulingError(
+            "Unable to reject the request. Please try again."
+        ) from exc
+
+
+def _acquire_date_locks(*dates):
+    for item in sorted(set(dates)):
+        acquire_schedule_date_lock(item)
+
+
+def _lock_booking_with_current_dates(booking_id, target_date=None, attempts=3):
+    """Lock a booking only after advisory-locking its actual current date."""
+    for _attempt in range(attempts):
+        candidate_date = db.session.scalar(
+            db.select(ScheduledBooking.schedule_date).where(
+                ScheduledBooking.id == booking_id
+            )
+        )
+        if candidate_date is None:
+            raise SchedulingError("Booking not found.")
+        dates = (
+            (candidate_date,)
+            if target_date is None
+            else (
+                candidate_date,
+                target_date,
+            )
+        )
+        _acquire_date_locks(*dates)
+        actor = lock_actor((UserRole.ADMIN, UserRole.SCHEDULER))
+        booking = db.session.scalar(
+            db.select(ScheduledBooking)
+            .where(ScheduledBooking.id == booking_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if booking is None:
+            raise SchedulingError("Booking not found.")
+        if booking.schedule_date == candidate_date:
+            return actor, booking, candidate_date
+        db.session.rollback()
+    raise SchedulingConflictError("The booking changed concurrently. Please try again.")
+
+
+def _lock_consistent_request(booking):
+    record = db.session.scalar(
+        db.select(BookingRequest)
+        .where(BookingRequest.id == booking.request_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if record is None:
+        raise SchedulingError("The booking request is unavailable.")
+    other_booking = db.session.scalar(
+        db.select(ScheduledBooking.id).where(
+            ScheduledBooking.request_id == record.id,
+            ScheduledBooking.id != booking.id,
+        ).with_for_update()
+    )
+    valid_active_state = (
+        booking.is_active and record.status == RequestStatus.SCHEDULED
+    )
+    valid_cancelled_state = (
+        not booking.is_active and record.status == RequestStatus.CANCELLED
+    )
+    if (
+        booking.request_id != record.id
+        or booking.class_id != record.class_id
+        or booking.teacher_id != record.teacher_id
+        or other_booking is not None
+        or not (valid_active_state or valid_cancelled_state)
+    ):
+        raise SchedulingError(
+            "The booking and request records are inconsistent. "
+            "Please contact an Administrator."
+        )
+    return record
+
+
+def _is_slot_uniqueness_error(exc):
+    """Recognize only the active scheduling-slot uniqueness constraints."""
+    names = (
+        "uq_active_room_slot",
+        "uq_active_class_slot",
+        "uq_active_teacher_slot",
+    )
+    original = getattr(exc, "orig", None)
+    diagnostic = getattr(original, "diag", None)
+    constraint_name = getattr(diagnostic, "constraint_name", None)
+    if isinstance(constraint_name, str):
+        return constraint_name.strip('"').lower() in names
+    detail = str(original or "").lower()
+    sqlite_signatures = tuple(
+        ", ".join(
+            (
+                "scheduled_bookings.schedule_date",
+                "scheduled_bookings.prep",
+                f"scheduled_bookings.{identity}",
+            )
+        )
+        for identity in ("room_id", "class_id", "teacher_id")
+    )
+    return any(name in detail for name in names) or any(
+        signature in detail for signature in sqlite_signatures
+    )
+
+
+def reschedule_booking(booking_id, new_date, new_prep, new_room_id):
+    """Move an active booking while preserving its identity and history."""
+    try:
+        if type(booking_id) is not int or booking_id <= 0:
+            raise SchedulingError("Select a valid booking.")
+        if not isinstance(new_date, date) or isinstance(new_date, datetime):
+            raise SchedulingError("Select a valid schedule date.")
+        if not isinstance(new_prep, PrepPeriod):
+            raise SchedulingError("Select a valid prep period.")
+        if type(new_room_id) is not int or new_room_id <= 0:
+            raise SchedulingError("Select a valid room.")
+        actor, booking, old_date = _lock_booking_with_current_dates(
+            booking_id, new_date
+        )
+        record = _lock_consistent_request(booking)
+        if not booking.is_active:
+            raise SchedulingConflictError("This booking is no longer active.")
+        require_planning_date(new_date)
+        if new_prep not in tuple(PrepPeriod):
+            raise SchedulingError("Select a valid prep period.")
+        room = _locked_active(Room, new_room_id)
+        school_class = _locked_active(SchoolClass, booking.class_id)
+        teacher = db.session.scalar(
+            db.select(User)
+            .where(
+                User.id == booking.teacher_id,
+                User.role == UserRole.TEACHER,
+                User.is_active.is_(True),
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if room is None or school_class is None or teacher is None:
+            raise SchedulingConflictError(
+                "The selected room, class, or responsible Teacher is inactive."
+            )
+        if (
+            booking.schedule_date == new_date
+            and booking.prep == new_prep
+            and booking.room_id == new_room_id
+        ):
+            db.session.rollback()
+            return False, old_date
+        if _slot_conflict(
+            new_date,
+            new_prep,
+            room.id,
+            booking.class_id,
+            booking.teacher_id,
+            booking.id,
+        ):
+            raise SchedulingConflictError(
+                "That room, class, or responsible Teacher is unavailable for the slot."
+            )
+        old = {
+            "date": booking.schedule_date.isoformat(),
+            "prep": booking.prep.value,
+            "room_id": booking.room_id,
+        }
+        booking.schedule_date = new_date
+        booking.prep = new_prep
+        booking.room_id = room.id
+        db.session.flush()
+        db.session.add(
+            Notification(
+                user_id=record.requester_id,
+                type=NotificationType.RESCHEDULED,
+                title="Smart Class booking changed",
+                message=(
+                    f"{new_date.isoformat()}, {PREP_LABELS[new_prep]}, "
+                    f"{room.name}, {school_class.name}."
+                ),
+                booking_request_id=record.id,
+            )
+        )
+        db.session.add(
+            AuditLog(
+                actor_id=actor.id,
+                action="BOOKING_RESCHEDULED",
+                entity_type="ScheduledBooking",
+                entity_id=booking.id,
+                details={
+                    "request_id": record.id,
+                    "booking_id": booking.id,
+                    "old_slot": old,
+                    "new_slot": {
+                        "date": new_date.isoformat(),
+                        "prep": new_prep.value,
+                        "room_id": room.id,
+                    },
+                },
+            )
+        )
+        db.session.commit()
+        return True, new_date
+    except IntegrityError as exc:
+        db.session.rollback()
+        if _is_slot_uniqueness_error(exc):
+            raise SchedulingConflictError(
+                "The requested slot was taken concurrently. Please choose another."
+            ) from exc
+        raise SchedulingError(
+            "Unable to reschedule the booking. Please try again."
+        ) from exc
+    except SchedulingError:
+        db.session.rollback()
+        raise
+    except (SQLAlchemyError, ValueError, TypeError, AttributeError) as exc:
+        db.session.rollback()
+        raise SchedulingError(
+            "Unable to reschedule the booking. Please try again."
+        ) from exc
+
+
+def cancel_booking(booking_id):
+    """Soft-cancel an active Scheduled booking."""
+    try:
+        if type(booking_id) is not int or booking_id <= 0:
+            raise SchedulingError("Select a valid booking.")
+        actor, booking, schedule_date = _lock_booking_with_current_dates(booking_id)
+        record = _lock_consistent_request(booking)
+        if not booking.is_active:
+            db.session.rollback()
+            return False, schedule_date
+        now = datetime.now(UTC)
+        booking.is_active = False
+        booking.cancelled_at = now
+        record.status = RequestStatus.CANCELLED
+        record.cancelled_at = now
+        db.session.add(
+            Notification(
+                user_id=record.requester_id,
+                type=NotificationType.CANCELLED,
+                title="Smart Class booking cancelled",
+                message=(
+                    f"{schedule_date.isoformat()}, {PREP_LABELS[booking.prep]}, "
+                    f"{booking.room.name}, {booking.school_class.name}."
+                ),
+                booking_request_id=record.id,
+            )
+        )
+        db.session.add(
+            AuditLog(
+                actor_id=actor.id,
+                action="BOOKING_CANCELLED",
+                entity_type="ScheduledBooking",
+                entity_id=booking.id,
+                details={
+                    "request_id": record.id,
+                    "booking_id": booking.id,
+                    "date": schedule_date.isoformat(),
+                    "prep": booking.prep.value,
+                    "room_id": booking.room_id,
+                    "status_transition": "SCHEDULED->CANCELLED",
+                },
+            )
+        )
+        db.session.commit()
+        return True, schedule_date
+    except SchedulingError:
+        db.session.rollback()
+        raise
+    except (SQLAlchemyError, ValueError, TypeError, AttributeError) as exc:
+        db.session.rollback()
+        raise SchedulingError(
+            "Unable to cancel the booking. Please try again."
+        ) from exc

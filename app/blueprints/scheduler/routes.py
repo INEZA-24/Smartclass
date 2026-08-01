@@ -8,7 +8,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.authz import ROLE_LABELS, role_required, roles_required
 from app.blueprints.scheduler import bp
-from app.blueprints.scheduler.forms import ActionForm, BlockForm, ScheduleRequestForm
+from app.blueprints.scheduler.forms import (
+    ActionForm,
+    BlockForm,
+    RejectionForm,
+    ScheduleRequestForm,
+)
 from app.booking_queue import queue_state, request_origin_role
 from app.extensions import db
 from app.models import (
@@ -18,15 +23,19 @@ from app.models import (
     RequestPriority,
     RequestStatus,
     Room,
+    ScheduledBooking,
     UserRole,
 )
 from app.scheduling import (
     PREP_LABELS,
     SchedulingError,
+    cancel_booking,
     create_block,
     planning_window,
+    reject_request,
     remove_block,
     require_planning_date,
+    reschedule_booking,
     schedule_request,
     slot_states,
 )
@@ -57,6 +66,27 @@ def _active_room_choices():
 def _prep_choices(blank=False):
     choices = [(item.value, PREP_LABELS[item]) for item in PrepPeriod]
     return ([("", "Not applicable")] if blank else []) + choices
+
+
+def _booking_can_be_modified(booking):
+    request_record = booking.request
+    if (
+        not booking.is_active
+        or request_record is None
+        or request_record.status != RequestStatus.SCHEDULED
+        or booking.class_id != request_record.class_id
+        or booking.teacher_id != request_record.teacher_id
+    ):
+        return False
+    return (
+        db.session.scalar(
+            db.select(ScheduledBooking.id).where(
+                ScheduledBooking.request_id == booking.request_id,
+                ScheduledBooking.id != booking.id,
+            )
+        )
+        is None
+    )
 
 
 @bp.get("/")
@@ -131,6 +161,11 @@ def day_schedule(date_value):
         states=states,
         block_form=form,
         action_form=ActionForm(),
+        can_modify_booking={
+            record.id: _booking_can_be_modified(record)
+            for state, record in states.values()
+            if state == "Booked"
+        },
     )
 
 
@@ -222,3 +257,101 @@ def unblock(block_id):
     return redirect(
         url_for("scheduler.day_schedule", date_value=block_date.isoformat())
     )
+
+
+@bp.route("/requests/<int:request_id>/reject", methods=["GET", "POST"])
+@role_required(UserRole.SCHEDULER)
+def reject_pending_request(request_id):
+    record = db.get_or_404(BookingRequest, request_id)
+    if record.status != RequestStatus.PENDING:
+        flash("Request was already processed.", "info")
+        return redirect(url_for("scheduler.pending_queue"))
+    form = RejectionForm()
+    if form.validate_on_submit():
+        try:
+            changed = reject_request(record.id, form.reason.data)
+        except SchedulingError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash(
+                "Request rejected." if changed else "Request was already processed.",
+                "success" if changed else "info",
+            )
+            return redirect(url_for("scheduler.pending_queue"))
+    return render_template(
+        "scheduler/reject_form.html",
+        form=form,
+        request_record=record,
+        origin_label=ROLE_LABELS[request_origin_role(record.priority)],
+    )
+
+
+@bp.get("/bookings/<int:booking_id>")
+@roles_required(UserRole.ADMIN, UserRole.SCHEDULER)
+def booking_detail(booking_id):
+    booking = db.get_or_404(ScheduledBooking, booking_id)
+    return render_template(
+        "scheduler/booking_detail.html",
+        booking=booking,
+        can_modify_booking=_booking_can_be_modified(booking),
+        action_form=ActionForm(),
+    )
+
+
+@bp.route("/bookings/<int:booking_id>/reschedule", methods=["GET", "POST"])
+@roles_required(UserRole.ADMIN, UserRole.SCHEDULER)
+def reschedule(booking_id):
+    booking = db.get_or_404(ScheduledBooking, booking_id)
+    if not _booking_can_be_modified(booking):
+        flash("This booking cannot be rescheduled in its current state.", "info")
+        return redirect(
+            url_for("scheduler.booking_detail", booking_id=booking.id)
+        )
+    form = ScheduleRequestForm()
+    form.submit.label.text = "Reschedule booking"
+    form.prep.choices = _prep_choices()
+    form.room_id.choices = _active_room_choices()
+    if not form.is_submitted():
+        form.schedule_date.data = booking.schedule_date
+        form.prep.data = booking.prep.value
+        form.room_id.data = booking.room_id
+    if form.validate_on_submit():
+        try:
+            changed, target = reschedule_booking(
+                booking.id,
+                form.schedule_date.data,
+                PrepPeriod(form.prep.data),
+                form.room_id.data,
+            )
+        except SchedulingError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash(
+                "Booking rescheduled." if changed else "Schedule is unchanged.",
+                "success" if changed else "info",
+            )
+            return redirect(
+                url_for("scheduler.day_schedule", date_value=target.isoformat())
+            )
+    return render_template("scheduler/reschedule_form.html", form=form, booking=booking)
+
+
+@bp.post("/bookings/<int:booking_id>/cancel")
+@roles_required(UserRole.ADMIN, UserRole.SCHEDULER)
+def cancel_scheduled(booking_id):
+    if not ActionForm().validate_on_submit():
+        abort(400)
+    try:
+        changed, _schedule_date = cancel_booking(booking_id)
+    except SchedulingError as exc:
+        flash(str(exc), "danger")
+        if db.session.get(ScheduledBooking, booking_id) is not None:
+            return redirect(
+                url_for("scheduler.booking_detail", booking_id=booking_id)
+            )
+        return redirect(url_for("scheduler.schedule_index"))
+    flash(
+        "Booking cancelled." if changed else "Booking was already cancelled.",
+        "success" if changed else "info",
+    )
+    return redirect(url_for("scheduler.booking_detail", booking_id=booking_id))

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Reject Request | SCMS{% endblock %}
+{% block content %}
+  <h1>Reject request</h1>
+  <dl class="row">
+    <dt class="col-sm-3">Requester</dt><dd class="col-sm-9">{{ request_record.requester.full_name }}</dd>
+    <dt class="col-sm-3">Requester role</dt><dd class="col-sm-9">{{ origin_label }}</dd>
+    <dt class="col-sm-3">Priority</dt><dd class="col-sm-9">{{ request_record.priority.value }}</dd>
+    <dt class="col-sm-3">Class</dt><dd class="col-sm-9">{{ request_record.school_class.name }}</dd>
+    <dt class="col-sm-3">Responsible Teacher</dt><dd class="col-sm-9">{{ request_record.teacher.full_name }}</dd>
+    <dt class="col-sm-3">Subject</dt><dd class="col-sm-9">{{ request_record.subject }}</dd>
+    <dt class="col-sm-3">Private reason</dt><dd class="col-sm-9">{{ request_record.reason }}</dd>
+    <dt class="col-sm-3">Submitted</dt><dd class="col-sm-9">{{ request_record.created_at }}</dd>
+  </dl>
+  <form method="post" class="card card-body">{{ form.hidden_tag() }}{{ form.reason.label(class="form-label") }}{{ form.reason(class="form-control") }}{% for error in form.reason.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}{{ form.submit(class="btn btn-danger mt-3") }}</form>
+{% endblock %}

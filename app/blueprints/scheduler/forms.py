@@ -22,3 +22,10 @@ class BlockForm(FlaskForm):
 
 class ActionForm(FlaskForm):
     submit = SubmitField("Confirm")
+
+
+class RejectionForm(FlaskForm):
+    reason = TextAreaField(
+        "Rejection reason", validators=[DataRequired(), Length(max=2000)]
+    )
+    submit = SubmitField("Reject request")

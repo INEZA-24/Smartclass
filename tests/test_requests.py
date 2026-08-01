@@ -479,7 +479,7 @@ def test_scheduler_queue_is_read_only_and_priority_ordered(client, app):
     assert page.data.index(b"Teacher Old") < page.data.index(b"Teacher New")
     assert page.data.index(b"Teacher New") < page.data.index(b"Monitor Old")
     assert b"Teacher private" in page.data
-    assert b">Schedule<" in page.data and b">Reject<" not in page.data
+    assert b">Schedule<" in page.data and b">Reject<" in page.data
     assert scheduler_id
 
 

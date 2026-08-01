@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Booking Details | SCMS{% endblock %}
+{% block content %}
+  <h1>Booking details</h1>
+  <p><span class="badge text-bg-{{ 'success' if booking.is_active else 'secondary' }}">{{ 'Active' if booking.is_active else 'Cancelled' }}</span></p>
+  <dl class="row"><dt class="col-sm-3">Date</dt><dd class="col-sm-9">{{ booking.schedule_date }}</dd><dt class="col-sm-3">Prep</dt><dd class="col-sm-9">{{ booking.prep.value.replace('_', ' ').title() }}</dd><dt class="col-sm-3">Room</dt><dd class="col-sm-9">{{ booking.room.name }}</dd><dt class="col-sm-3">Class</dt><dd class="col-sm-9">{{ booking.school_class.name }}</dd><dt class="col-sm-3">Teacher</dt><dd class="col-sm-9">{{ booking.teacher.full_name }}</dd></dl>
+  {% if can_modify_booking %}<a class="btn btn-primary" href="{{ url_for('scheduler.reschedule', booking_id=booking.id) }}">Reschedule</a><form class="d-inline" method="post" action="{{ url_for('scheduler.cancel_scheduled', booking_id=booking.id) }}" onsubmit="return confirm('Cancel this booking?')">{{ action_form.hidden_tag() }}<button class="btn btn-danger">Cancel</button></form>{% elif not booking.is_active %}<span class="badge text-bg-secondary">Cancelled</span>{% endif %}
+{% endblock %}
