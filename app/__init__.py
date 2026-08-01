@@ -11,11 +11,12 @@ from flask_login import current_user, logout_user
 from app.authz import dashboard_url
 from app.blueprints.admin import bp as admin_bp
 from app.blueprints.auth import bp as auth_bp
+from app.blueprints.notifications import bp as notifications_bp
 from app.blueprints.public import bp as public_bp
 from app.blueprints.requester import bp as requester_bp
 from app.blueprints.scheduler import bp as scheduler_bp
 from app.extensions import csrf, db, login_manager, migrate
-from app.models import User
+from app.models import Notification, User
 from app.seed import seed_command
 from config import apply_runtime_environment, config_by_name, normalize_database_url
 
@@ -52,10 +53,25 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
 
     app.register_blueprint(public_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(notifications_bp, url_prefix="/notifications")
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(scheduler_bp, url_prefix="/scheduler")
     app.register_blueprint(requester_bp, url_prefix="/requester")
     app.jinja_env.globals["dashboard_url"] = dashboard_url
+
+    @app.context_processor
+    def notification_navigation():
+        if not current_user.is_authenticated or current_user.must_change_password:
+            return {"notification_unread_count": 0}
+        count = db.session.scalar(
+            db.select(db.func.count())
+            .select_from(Notification)
+            .where(
+                Notification.user_id == current_user.id,
+                Notification.is_read.is_(False),
+            )
+        )
+        return {"notification_unread_count": count}
 
     @app.before_request
     def enforce_temporary_password_change():

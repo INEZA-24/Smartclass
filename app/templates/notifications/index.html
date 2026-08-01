@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Notifications | SCMS{% endblock %}
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">Notifications</h1>
+      <p class="text-body-secondary mb-0">{{ unread_count }} unread</p>
+    </div>
+    <form method="post" action="{{ url_for('notifications.mark_all_read') }}">
+      {{ action_form.hidden_tag() }}
+      <button class="btn btn-outline-primary" type="submit">Mark all as read</button>
+    </form>
+  </div>
+
+  {% if notifications %}
+    <div class="list-group">
+      {% for notification in notifications %}
+        <article
+          class="list-group-item list-group-item-action{% if not notification.is_read %} border-start border-primary border-4{% endif %}"
+          aria-label="{{ 'Unread' if not notification.is_read else 'Read' }} notification: {{ notification.title }}"
+        >
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <h2 class="h5 mb-0">{{ notification.title }}</h2>
+                <span class="badge text-bg-secondary">{{ notification.type.value.replace('_', ' ').title() }}</span>
+                {% if not notification.is_read %}
+                  <span class="badge text-bg-primary">Unread</span>
+                {% else %}
+                  <span class="visually-hidden">Read</span>
+                {% endif %}
+              </div>
+              <p class="my-2">{{ notification.message }}</p>
+              <time class="small text-body-secondary" datetime="{{ notification.created_at.isoformat() }}">
+                {{ notification.created_at.strftime("%Y-%m-%d %H:%M") }}
+              </time>
+              {% if related_links[notification.id] %}
+                <div><a href="{{ related_links[notification.id] }}">View related request</a></div>
+              {% endif %}
+            </div>
+            {% if not notification.is_read %}
+              <form method="post" action="{{ url_for('notifications.mark_read', notification_id=notification.id) }}">
+                {{ action_form.hidden_tag() }}
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  type="submit"
+                  aria-label="Mark {{ notification.title }} as read"
+                >Mark as read</button>
+              </form>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="alert alert-info">You have no notifications.</p>
+  {% endif %}
+{% endblock %}

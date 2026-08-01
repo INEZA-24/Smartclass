@@ -6,6 +6,7 @@ from flask_login import UserMixin
 from sqlalchemy import JSON, BigInteger, CheckConstraint, Enum, Index, event, inspect
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, validates
+from sqlalchemy.types import TypeDecorator
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
@@ -19,6 +20,27 @@ from app.models.enums import (
 )
 
 PK = BigInteger().with_variant(db.Integer, "sqlite")
+
+
+class UTCDateTime(TypeDecorator):
+    """Preserve timezone awareness when SQLite returns naive datetimes."""
+
+    impl = db.DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, _dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+    def process_result_value(self, value, _dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
 
 def now_utc() -> datetime:
@@ -212,7 +234,7 @@ class Notification(db.Model):
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=now_utc, index=True
     )
-    read_at = db.Column(db.DateTime(timezone=True))
+    read_at = db.Column(UTCDateTime())
     user = db.relationship("User")
     booking_request = db.relationship("BookingRequest")
 

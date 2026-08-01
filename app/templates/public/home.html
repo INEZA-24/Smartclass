@@ -1,10 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Home | Smart Class Management System{% endblock %}
+{% block title %}Today's Smart Class Schedule | College Saint Andre{% endblock %}
 
 {% block content %}
-  <section class="p-5 bg-white rounded-3 shadow-sm text-center">
-    <h1 class="display-5 fw-semibold">Smart Class Management System</h1>
-    <p class="lead mb-0">College Saint Andre</p>
+  <section class="p-4 p-md-5 bg-white rounded-3 shadow-sm">
+    <div class="text-center mb-4">
+      <h1 class="display-6 fw-semibold">College Saint Andre</h1>
+      <p class="text-body-secondary mb-1">Smart Class Management System</p>
+      <p class="lead mb-1">Today's Smart Class Schedule</p>
+      <time datetime="{{ schedule_date.isoformat() }}">{{ schedule_date.strftime("%A, %d %B %Y") }}</time>
+    </div>
+    {% set total = namespace(value=0) %}
+    {% for prep, bookings in schedule.items() %}{% set total.value = total.value + bookings|length %}{% if bookings %}
+      <section class="mb-4" aria-labelledby="{{ prep.value|lower }}-heading">
+        <h2 id="{{ prep.value|lower }}-heading" class="h4">{{ prep_labels[prep] }}</h2>
+        <div class="table-responsive"><table class="table table-striped align-middle"><thead><tr><th scope="col">Room</th><th scope="col">Class</th><th scope="col">Responsible Teacher</th></tr></thead><tbody>
+          {% for booking in bookings %}<tr><td>{{ booking.room_name }}</td><td>{{ booking.class_name }}</td><td>{{ booking.teacher_name }}</td></tr>{% endfor %}
+        </tbody></table></div>
+      </section>
+    {% endif %}{% endfor %}
+    {% if total.value == 0 %}<p class="alert alert-info mb-0">No Smart Class sessions are scheduled for today.</p>{% endif %}
   </section>
 {% endblock %}

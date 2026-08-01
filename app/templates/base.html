@@ -17,6 +17,7 @@
         <a class="navbar-brand" href="{{ url_for('public.home') }}">SCMS</a>
         <div class="ms-auto d-flex align-items-center gap-3 text-white">
           {% if current_user.is_authenticated %}
+            {% if not current_user.must_change_password %}<a class="nav-link" href="{{ url_for('notifications.index') }}">Notifications{% if notification_unread_count %} <span class="badge text-bg-light">{{ notification_unread_count }}</span>{% endif %}</a>{% endif %}
             {% if current_user.role.value == "ADMIN" and not current_user.must_change_password %}
               <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
               <a class="nav-link" href="{{ url_for('admin.users') }}">Users</a>
