@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Schedule {{ selected_date }} | SCMS{% endblock %}
+{% block content %}
+  <h1>Schedule for {{ selected_date.strftime("%A, %d %B %Y") }}</h1>
+  <div class="btn-group mb-3" role="group" aria-label="Planning dates">
+    {% for item in dates %}<a class="btn btn-{{ 'primary' if item == selected_date else 'outline-primary' }}" href="{{ url_for('scheduler.day_schedule', date_value=item.isoformat()) }}">{{ item.strftime("%a %d") }}</a>{% endfor %}
+  </div>
+  <div class="table-responsive"><table class="table table-bordered align-middle"><thead><tr><th>Prep</th>{% for room in rooms %}<th>{{ room.name }}</th>{% endfor %}</tr></thead><tbody>
+    {% for prep in preps %}<tr><th>{{ prep_labels[prep] }}</th>{% for room in rooms %}{% set state, record = states[(room.id, prep)] %}<td>
+      <span class="badge text-bg-{{ 'success' if state == 'Available' else ('primary' if state == 'Booked' else 'secondary') }}">{{ state }}</span>
+      {% if state == "Booked" %}<div>{{ record.school_class.name }}</div><div>{{ record.teacher.full_name }}</div><div>Requested by {{ record.request.requester.full_name }}</div>{% if record.request.subject %}<div>{{ record.request.subject }}</div>{% endif %}
+      {% elif state == "Unavailable" %}<div>{{ record.scope.value.replace("_", " ").title() }}</div>{% if record.reason %}<div>{{ record.reason }}</div>{% endif %}<form method="post" action="{{ url_for('scheduler.unblock', block_id=record.id) }}" onsubmit="return confirm('Remove this block?')">{{ action_form.hidden_tag() }}<button class="btn btn-sm btn-outline-danger mt-2">Unblock</button></form>
+      {% else %}{% if current_user.role.value == "SCHEDULER" %}<a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('scheduler.pending_queue') }}">Schedule request</a>{% endif %}
+      <form method="post" action="{{ url_for('scheduler.add_block', date_value=selected_date.isoformat()) }}" class="mt-2">{{ action_form.hidden_tag() }}<input type="hidden" name="scope" value="SLOT"><input type="hidden" name="room_id" value="{{ room.id }}"><input type="hidden" name="prep" value="{{ prep.value }}"><button class="btn btn-sm btn-outline-secondary">Block slot</button></form>{% endif %}
+    </td>{% endfor %}</tr>{% endfor %}
+  </tbody></table></div>
+  <h2 class="h4">Create availability block</h2>
+  <form method="post" action="{{ url_for('scheduler.add_block', date_value=selected_date.isoformat()) }}" class="card card-body">
+    {{ block_form.hidden_tag() }}
+    {% for field in [block_form.scope, block_form.room_id, block_form.prep, block_form.reason] %}<div class="mb-3">{{ field.label(class="form-label") }}{{ field(class="form-control") }}</div>{% endfor %}
+    {{ block_form.submit(class="btn btn-secondary") }}
+  </form>
+{% endblock %}

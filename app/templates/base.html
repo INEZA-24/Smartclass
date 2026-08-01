@@ -22,6 +22,7 @@
               <a class="nav-link" href="{{ url_for('admin.users') }}">Users</a>
               <a class="nav-link" href="{{ url_for('admin.classes') }}">Classes</a>
               <a class="nav-link" href="{{ url_for('admin.rooms') }}">Rooms</a>
+              <a class="nav-link" href="{{ url_for('scheduler.schedule_index') }}">Schedule</a>
             {% elif current_user.role.value in ["TEACHER", "MONITOR"] and not current_user.must_change_password %}
               <a class="nav-link" href="{{ dashboard_url() }}">Dashboard</a>
               <a class="nav-link" href="{{ url_for('requester.teacher_new' if current_user.role.value == 'TEACHER' else 'requester.monitor_new') }}">New Request</a>
@@ -29,6 +30,7 @@
             {% elif current_user.role.value == "SCHEDULER" and not current_user.must_change_password %}
               <a class="nav-link" href="{{ dashboard_url() }}">Dashboard</a>
               <a class="nav-link" href="{{ url_for('scheduler.pending_queue') }}">Pending Queue</a>
+              <a class="nav-link" href="{{ url_for('scheduler.schedule_index') }}">Schedule</a>
             {% else %}
               <a class="nav-link" href="{{ dashboard_url() }}">Dashboard</a>
             {% endif %}

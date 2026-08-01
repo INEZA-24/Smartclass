@@ -48,3 +48,19 @@ def role_required(role: UserRole) -> Callable:
         return wrapped
 
     return decorator
+
+
+def roles_required(*roles: UserRole) -> Callable:
+    """Require authentication and membership in an explicit role set."""
+
+    def decorator(view):
+        @wraps(view)
+        @login_required
+        def wrapped(*args, **kwargs):
+            if current_user.role not in roles:
+                abort(403)
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    return decorator

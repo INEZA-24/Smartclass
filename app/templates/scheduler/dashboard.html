@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Scheduler Dashboard | SCMS{% endblock %}
+{% block content %}
+  <h1>Patron/Matron dashboard</h1>
+  <p>Welcome, {{ user.full_name }}.</p>
+  {% if settings %}
+    <div class="alert alert-info">Pending requests: {{ pending_count }}/{{ settings.max_pending_requests }} <span class="badge text-bg-{{ 'danger' if settings.booking_queue_locked else 'success' }}">{{ "Locked" if settings.booking_queue_locked else "Open" }}</span></div>
+  {% else %}<div class="alert alert-danger">System settings are unavailable.</div>{% endif %}
+  <div class="alert alert-warning">Prepare tomorrow's Smart Class schedule.</div>
+  <div class="row g-3 mb-4">
+    {% for day in days %}
+      <div class="col-md-4"><div class="card h-100"><div class="card-body">
+        <h2 class="h5">{{ day.date.strftime("%A, %d %B") }}</h2>
+        <p class="mb-1">Booked: {{ day.counts.Booked }}</p>
+        <p class="mb-1">Available: {{ day.counts.Available }}</p>
+        <p>Unavailable: {{ day.counts.Unavailable }}</p>
+        {% if loop.index == 2 %}<p><strong>Tomorrow's remaining capacity: {{ day.counts.Available }}</strong></p>{% endif %}
+        <a class="btn btn-outline-primary" href="{{ url_for('scheduler.day_schedule', date_value=day.date.isoformat()) }}">View schedule</a>
+      </div></div></div>
+    {% endfor %}
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('scheduler.pending_queue') }}">Pending queue</a>
+{% endblock %}
