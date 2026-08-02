@@ -10,14 +10,39 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, EqualTo, Length, Optional, ValidationError
 
-from app.blueprints.auth.forms import MINIMUM_PASSWORD_LENGTH
 from app.models import UserRole
+from app.user_validation import (
+    validate_full_name,
+    validate_temporary_password,
+    validate_username,
+)
 
 
 def required_trimmed(form, field):
     """Reject values containing only whitespace."""
     if not field.data or not field.data.strip():
         raise ValidationError("This field is required.")
+
+
+def account_username(_form, field):
+    try:
+        validate_username(field.data)
+    except ValueError as error:
+        raise ValidationError(str(error)) from error
+
+
+def account_full_name(_form, field):
+    try:
+        validate_full_name(field.data)
+    except ValueError as error:
+        raise ValidationError(str(error)) from error
+
+
+def account_temporary_password(_form, field):
+    try:
+        validate_temporary_password(field.data)
+    except ValueError as error:
+        raise ValidationError(str(error)) from error
 
 
 ROLE_CHOICES = [
@@ -30,10 +55,18 @@ ROLE_CHOICES = [
 
 class UserBaseForm(FlaskForm):
     full_name = StringField(
-        "Full name", validators=[DataRequired(), Length(max=150), required_trimmed]
+        "Full name",
+        validators=[
+            DataRequired(),
+            account_full_name,
+        ],
     )
     username = StringField(
-        "Username", validators=[DataRequired(), Length(max=80), required_trimmed]
+        "Username",
+        validators=[
+            DataRequired(),
+            account_username,
+        ],
     )
     role = SelectField("Role", choices=ROLE_CHOICES, validators=[DataRequired()])
     class_id = SelectField(
@@ -49,7 +82,7 @@ class UserBaseForm(FlaskForm):
 class UserCreateForm(UserBaseForm):
     temporary_password = PasswordField(
         "Temporary password",
-        validators=[DataRequired(), Length(min=MINIMUM_PASSWORD_LENGTH)],
+        validators=[DataRequired(), account_temporary_password],
     )
     confirm_password = PasswordField(
         "Confirm temporary password",
@@ -65,7 +98,7 @@ class UserEditForm(UserBaseForm):
 class TemporaryPasswordForm(FlaskForm):
     temporary_password = PasswordField(
         "Temporary password",
-        validators=[DataRequired(), Length(min=MINIMUM_PASSWORD_LENGTH)],
+        validators=[DataRequired(), account_temporary_password],
     )
     confirm_password = PasswordField(
         "Confirm temporary password",

@@ -42,5 +42,6 @@ class NotificationType(StringEnum):
     REJECTED = "REJECTED"
     RESCHEDULED = "RESCHEDULED"
     CANCELLED = "CANCELLED"
-    PASSWORD_RESET = "PASSWORD_RESET"
+    # Notification type name, not a credential.
+    PASSWORD_RESET = "PASSWORD_RESET"  # nosec B105
     SYSTEM = "SYSTEM"

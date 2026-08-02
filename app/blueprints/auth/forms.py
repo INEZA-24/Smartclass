@@ -4,7 +4,7 @@ from flask_wtf import FlaskForm
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, EqualTo, Length
 
-MINIMUM_PASSWORD_LENGTH = 12
+from app.user_validation import MINIMUM_PASSWORD_LENGTH
 
 
 class LoginForm(FlaskForm):

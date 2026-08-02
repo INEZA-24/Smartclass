@@ -1,6 +1,6 @@
 """Public routes."""
 
-from flask import jsonify, render_template
+from flask import Response, render_template
 
 from app.blueprints.public import bp
 from app.extensions import db
@@ -47,4 +47,4 @@ def home() -> str:
 @bp.get("/health")
 def health():
     """Return a lightweight service health response."""
-    return jsonify(status="ok"), 200
+    return Response('{"status":"ok"}\n', status=200, mimetype="application/json")

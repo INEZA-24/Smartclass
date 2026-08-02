@@ -7,6 +7,7 @@ from typing import Any
 
 from flask import Flask, g, redirect, render_template, request, url_for
 from flask_login import current_user, logout_user
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.authz import dashboard_url
 from app.blueprints.admin import bp as admin_bp
@@ -18,8 +19,14 @@ from app.blueprints.requester import bp as requester_bp
 from app.blueprints.scheduler import bp as scheduler_bp
 from app.extensions import csrf, db, login_manager, migrate
 from app.models import Notification, User
+from app.provisioning import provision_admin_from_env_command
 from app.seed import seed_command
-from config import apply_runtime_environment, config_by_name, normalize_database_url
+from config import (
+    apply_runtime_environment,
+    config_by_name,
+    normalize_database_url,
+    validate_production_configuration,
+)
 
 
 def create_app(config: str | dict[str, Any] | None = None) -> Flask:
@@ -32,6 +39,7 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
         database_url = app.config.get("SQLALCHEMY_DATABASE_URI")
         if database_url:
             app.config["SQLALCHEMY_DATABASE_URI"] = normalize_database_url(database_url)
+        validate_production_configuration(app)
     else:
         config_name = config or os.getenv("APP_ENV", "development")
         if config_name not in config_by_name:
@@ -42,6 +50,17 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
         selected_config = config_by_name[config_name]
         app.config.from_object(selected_config)
         apply_runtime_environment(app)
+        validate_production_configuration(app)
+
+    if app.config.get("TRUST_RENDER_PROXY"):
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=1,
+            x_proto=1,
+            x_host=1,
+            x_port=0,
+            x_prefix=0,
+        )
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -49,6 +68,7 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
     login_manager.login_view = "auth.login"
     csrf.init_app(app)
     app.cli.add_command(seed_command)
+    app.cli.add_command(provision_admin_from_env_command)
 
     from app import models  # noqa: F401
 
@@ -81,6 +101,8 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
 
     @app.before_request
     def enforce_temporary_password_change():
+        if request.endpoint == "public.health":
+            return None
         if current_user.is_authenticated:
             user = db.session.get(
                 User, int(current_user.get_id()), populate_existing=True
@@ -112,7 +134,8 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
         g.rendering_error = True
         try:
             db.session.rollback()
-        except Exception:  # Session cleanup must not prevent the safe response.
+        # Cleanup failure must not mask the database-independent safe response.
+        except Exception:  # nosec B110
             pass
         template = app.jinja_env.get_template("errors/500.html")
         return template.render(), 500

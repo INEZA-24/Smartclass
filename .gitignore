@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 
 # Virtual environment
 .venv/
@@ -10,12 +13,23 @@ venv/
 
 # Environment secrets
 .env
-.env.local
+.env.*
+!.env.example
+.flaskenv
 
 # Flask
 instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Local review and deployment artifacts
+*-review*.diff
+milestone-*.diff
 
 # Editors and operating systems
 .vscode/
+.idea/
+*.code-workspace
 .DS_Store
 Thumbs.db

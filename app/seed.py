@@ -2,6 +2,7 @@
 
 import click
 from flask.cli import with_appcontext
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
 from app.models import Room, SchoolClass, SystemSettings
@@ -27,13 +28,17 @@ ROOM_NAMES = ["Smart Class 1", "Smart Class 2", "Smart Class 3"]
 @with_appcontext
 def seed_command():
     """Insert required reference data without creating duplicates."""
-    for name in CLASS_NAMES:
-        if db.session.scalar(db.select(SchoolClass).filter_by(name=name)) is None:
-            db.session.add(SchoolClass(name=name))
-    for name in ROOM_NAMES:
-        if db.session.scalar(db.select(Room).filter_by(name=name)) is None:
-            db.session.add(Room(name=name))
-    if db.session.get(SystemSettings, 1) is None:
-        db.session.add(SystemSettings(id=1))
-    db.session.commit()
+    try:
+        for name in CLASS_NAMES:
+            if db.session.scalar(db.select(SchoolClass).filter_by(name=name)) is None:
+                db.session.add(SchoolClass(name=name))
+        for name in ROOM_NAMES:
+            if db.session.scalar(db.select(Room).filter_by(name=name)) is None:
+                db.session.add(Room(name=name))
+        if db.session.get(SystemSettings, 1) is None:
+            db.session.add(SystemSettings(id=1))
+        db.session.commit()
+    except (SQLAlchemyError, ValueError) as error:
+        db.session.rollback()
+        raise click.ClickException("Unable to prepare seed data.") from error
     click.echo("Seed data is ready.")

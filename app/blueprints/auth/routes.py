@@ -15,7 +15,7 @@ from app.extensions import db
 from app.models import User
 
 INVALID_LOGIN_MESSAGE = "Invalid username or password."
-PASSWORD_CHANGE_ERROR = "Unable to change password. Please try again."
+PASSWORD_CHANGE_ERROR = "Unable to change password. Please try again."  # nosec B105
 DUMMY_PASSWORD_HASH = generate_password_hash("not-a-real-user-password")
 MAX_REDIRECT_DECODE_PASSES = 3
 

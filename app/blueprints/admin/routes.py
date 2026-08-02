@@ -16,16 +16,14 @@ from app.blueprints.admin.forms import (
 )
 from app.extensions import db
 from app.models import AuditLog, Room, SchoolClass, User, UserRole
+from app.user_validation import normalize_full_name, normalize_username
 
 GENERIC_ERROR = "Unable to save the change. Please try again."
 
 
 def normalize_name(value):
+    """Normalize non-account class and room names."""
     return " ".join(value.strip().split())
-
-
-def normalize_username(value):
-    return value.strip().lower()
 
 
 def active_class_choices():
@@ -145,12 +143,13 @@ def create_user():
         else:
             user = User(
                 username=username,
-                full_name=normalize_name(form.full_name.data),
+                full_name=normalize_full_name(form.full_name.data),
                 role=UserRole(form.role.data),
                 school_class=school_class,
                 is_active=form.is_active.data,
                 must_change_password=True,
-                password_hash="pending",
+                # Required model placeholder; set_password replaces it before flush.
+                password_hash="pending",  # nosec B106
             )
             user.set_password(form.temporary_password.data)
             db.session.add(user)
@@ -218,7 +217,7 @@ def edit_user(user_id):
                 user.class_id = None
                 user.school_class = None
                 user.role = new_role
-            user.full_name = normalize_name(form.full_name.data)
+            user.full_name = normalize_full_name(form.full_name.data)
             user.username = username
             user.is_active = form.is_active.data
             add_audit(
