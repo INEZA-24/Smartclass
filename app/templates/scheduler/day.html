@@ -1,23 +1,29 @@
 {% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
 {% block title %}Schedule {{ selected_date }} | SCMS{% endblock %}
 {% block content %}
   <h1>Schedule for {{ selected_date.strftime("%A, %d %B %Y") }}</h1>
   <div class="btn-group mb-3" role="group" aria-label="Planning dates">
-    {% for item in dates %}<a class="btn btn-{{ 'primary' if item == selected_date else 'outline-primary' }}" href="{{ url_for('scheduler.day_schedule', date_value=item.isoformat()) }}">{{ item.strftime("%a %d") }}</a>{% endfor %}
+    {% for item in dates %}<a class="btn btn-{{ 'primary' if item == selected_date else 'outline-primary' }}" href="{{ url_for('scheduler.day_schedule', date_value=item.isoformat()) }}"{% if item == selected_date %} aria-current="date"{% endif %}>{{ item.strftime("%a %d") }}</a>{% endfor %}
   </div>
-  <div class="table-responsive"><table class="table table-bordered align-middle"><thead><tr><th>Prep</th>{% for room in rooms %}<th>{{ room.name }}</th>{% endfor %}</tr></thead><tbody>
-    {% for prep in preps %}<tr><th>{{ prep_labels[prep] }}</th>{% for room in rooms %}{% set state, record = states[(room.id, prep)] %}<td>
+  <div class="table-responsive"><table class="table table-bordered align-middle"><caption class="visually-hidden">Availability for {{ selected_date }}</caption><thead><tr><th scope="col">Prep</th>{% for room in rooms %}<th scope="col">{{ room.name }}</th>{% endfor %}</tr></thead><tbody>
+    {% for prep in preps %}<tr><th scope="row">{{ prep_labels[prep] }}</th>{% for room in rooms %}{% set state, record = states[(room.id, prep)] %}<td>
       <span class="badge text-bg-{{ 'success' if state == 'Available' else ('primary' if state == 'Booked' else 'secondary') }}">{{ state }}</span>
-      {% if state == "Booked" %}<div>{{ record.school_class.name }}</div><div>{{ record.teacher.full_name }}</div><div>Requested by {{ record.request.requester.full_name }}</div>{% if record.request.subject %}<div>{{ record.request.subject }}</div>{% endif %}<a class="btn btn-sm btn-outline-secondary mt-2" href="{{ url_for('scheduler.booking_detail', booking_id=record.id) }}">View</a>{% if can_modify_booking[record.id] %} <a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('scheduler.reschedule', booking_id=record.id) }}">Reschedule</a><form class="d-inline" method="post" action="{{ url_for('scheduler.cancel_scheduled', booking_id=record.id) }}" onsubmit="return confirm('Cancel this booking?')">{{ action_form.hidden_tag() }}<button class="btn btn-sm btn-outline-danger mt-2">Cancel</button></form>{% endif %}
-      {% elif state == "Unavailable" %}<div>{{ record.scope.value.replace("_", " ").title() }}</div>{% if record.reason %}<div>{{ record.reason }}</div>{% endif %}<form method="post" action="{{ url_for('scheduler.unblock', block_id=record.id) }}" onsubmit="return confirm('Remove this block?')">{{ action_form.hidden_tag() }}<button class="btn btn-sm btn-outline-danger mt-2">Unblock</button></form>
+      {% if state == "Booked" %}<div>{{ record.school_class.name }}</div><div>{{ record.teacher.full_name }}</div><div>Requested by {{ record.request.requester.full_name }}</div>{% if record.request.subject %}<div>{{ record.request.subject }}</div>{% endif %}<div class="d-flex flex-wrap gap-1 mt-2"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('scheduler.booking_detail', booking_id=record.id) }}">View booking</a>{% if can_modify_booking[record.id] %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('scheduler.reschedule', booking_id=record.id) }}">Reschedule</a><form method="post" action="{{ url_for('scheduler.cancel_scheduled', booking_id=record.id) }}" data-confirm-message="Cancel the scheduled booking for {{ record.school_class.name }}? The slot will become available.">{{ action_form.hidden_tag() }}<button class="btn btn-sm btn-outline-danger" type="submit">Cancel booking</button></form>{% endif %}</div>
+      {% elif state == "Unavailable" %}<div>{{ record.scope.value.replace("_", " ").title() }}</div>{% if record.reason %}<div>{{ record.reason }}</div>{% endif %}<form method="post" action="{{ url_for('scheduler.unblock', block_id=record.id) }}" data-confirm-message="Remove this {{ record.scope.value.replace('_', ' ').lower() }} availability block for {{ selected_date }}? The affected slot or day will become available.">{{ action_form.hidden_tag() }}<button class="btn btn-sm btn-outline-danger mt-2" type="submit">Unblock availability</button></form>
       {% else %}{% if current_user.role.value == "SCHEDULER" %}<a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('scheduler.pending_queue') }}">Schedule request</a>{% endif %}
-      <form method="post" action="{{ url_for('scheduler.add_block', date_value=selected_date.isoformat()) }}" class="mt-2">{{ action_form.hidden_tag() }}<input type="hidden" name="scope" value="SLOT"><input type="hidden" name="room_id" value="{{ room.id }}"><input type="hidden" name="prep" value="{{ prep.value }}"><button class="btn btn-sm btn-outline-secondary">Block slot</button></form>{% endif %}
+      <form method="post" action="{{ url_for('scheduler.add_block', date_value=selected_date.isoformat()) }}" class="mt-2">{{ action_form.hidden_tag() }}<input type="hidden" name="scope" value="SLOT"><input type="hidden" name="room_id" value="{{ room.id }}"><input type="hidden" name="prep" value="{{ prep.value }}"><button class="btn btn-sm btn-outline-secondary" type="submit">Block slot</button></form>{% endif %}
     </td>{% endfor %}</tr>{% endfor %}
   </tbody></table></div>
   <h2 class="h4">Create availability block</h2>
   <form method="post" action="{{ url_for('scheduler.add_block', date_value=selected_date.isoformat()) }}" class="card card-body">
     {{ block_form.hidden_tag() }}
-    {% for field in [block_form.scope, block_form.room_id, block_form.prep, block_form.reason] %}<div class="mb-3">{{ field.label(class="form-label") }}{{ field(class="form-control") }}</div>{% endfor %}
+    <input type="hidden" name="block_form_mode" value="full">
+    {% if block_form.errors %}<div class="alert alert-danger" role="alert">Correct the highlighted block fields and try again.</div>{% endif %}
+    {{ render_field(block_form.scope, required=true, help_text='Choose whether to block one slot, one room for the day, or the full day.') }}
+    {{ render_field(block_form.room_id, help_text='Required for slot and room-day blocks.') }}
+    {{ render_field(block_form.prep, help_text='Required only for an exact slot block.') }}
+    {{ render_field(block_form.reason, help_text='Optional internal explanation for authorized scheduling staff.', rows=4) }}
     {{ block_form.submit(class="btn btn-secondary") }}
   </form>
 {% endblock %}

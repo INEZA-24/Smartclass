@@ -148,6 +148,55 @@ def scheduled(app):
     return ids
 
 
+def test_scheduled_cancellation_and_rejection_confirmations_are_safe(client, app):
+    ids = scheduled(app)
+    with app.app_context():
+        booking = db.session.get(ScheduledBooking, ids["booking"])
+        booking.school_class.name = 'Class "<Quoted>" O\'Neil é'
+        booking.request.reason = "PRIVATE-CONFIRMATION-REASON"
+        db.session.commit()
+    login(client, "admin")
+    app.config["WTF_CSRF_ENABLED"] = True
+    detail = client.get(f"/scheduler/bookings/{ids['booking']}")
+    confirmation = detail.data.split(b"data-confirm-message=", 1)[1].split(
+        b">", 1
+    )[0]
+    assert b"Cancel the scheduled booking" in confirmation
+    assert b"&lt;Quoted&gt;" in confirmation
+    assert b"PRIVATE-CONFIRMATION-REASON" not in confirmation
+    assert b'method="post"' in detail.data
+    assert b'name="csrf_token"' in detail.data
+    day = client.get(f"/scheduler/schedule/{planning_window()[0].isoformat()}")
+    assert b"Cancel the scheduled booking" in day.data
+    assert b"PRIVATE-CONFIRMATION-REASON" not in day.data.split(
+        b"data-confirm-message=", 1
+    )[1].split(b">", 1)[0]
+    assert client.get(f"/scheduler/bookings/{ids['booking']}/cancel").status_code == 405
+
+    app.config["WTF_CSRF_ENABLED"] = False
+    client.post("/auth/logout")
+    with app.app_context():
+        pending = BookingRequest(
+            requester=db.session.get(User, ids["teacher"]),
+            school_class=db.session.get(SchoolClass, ids["class"]),
+            subject='Reject "<Quoted>"',
+            reason="PRIVATE-REJECTION-CONFIRMATION",
+        )
+        db.session.add(pending)
+        db.session.commit()
+        pending_id = pending.id
+    login(client, "scheduler")
+    app.config["WTF_CSRF_ENABLED"] = True
+    rejection = client.get(f"/scheduler/requests/{pending_id}/reject")
+    reject_confirmation = rejection.data.split(b"data-confirm-message=", 1)[1].split(
+        b">", 1
+    )[0]
+    assert b"Reject this pending request" in reject_confirmation
+    assert b"Private" not in reject_confirmation
+    assert b'method="post"' in rejection.data
+    assert b'name="csrf_token"' in rejection.data
+
+
 @pytest.mark.parametrize("actor_key", ["scheduler", "admin"])
 def test_reschedule_preserves_booking_and_request(app, actor_key):
     ids = scheduled(app)

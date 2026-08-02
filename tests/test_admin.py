@@ -232,6 +232,18 @@ def test_temporary_password_reset_is_safe_and_audited(
     client, app, administrator
 ):
     user_id = add_user(app, "teacher", UserRole.TEACHER)
+    with app.app_context():
+        original_hash = db.session.get(User, user_id).password_hash
+    app.config["WTF_CSRF_ENABLED"] = True
+    page = client.get(f"/admin/users/{user_id}/temporary-password")
+    confirmation = page.data.split(b"data-confirm-message=", 1)[1].split(b">", 1)[0]
+    assert b"Reset this user" in confirmation
+    assert RESET_PASSWORD.encode() not in confirmation
+    assert b'method="post"' in page.data
+    assert b'name="csrf_token"' in page.data
+    with app.app_context():
+        assert db.session.get(User, user_id).password_hash == original_hash
+    app.config["WTF_CSRF_ENABLED"] = False
     response = client.post(
         f"/admin/users/{user_id}/temporary-password",
         data={

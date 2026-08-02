@@ -1,22 +1,22 @@
 <div class="table-responsive">
   <table class="table table-striped align-middle">
-    <thead><tr><th>Name</th><th>Status</th><th>Actions</th></tr></thead>
+    <caption class="visually-hidden">Managed {{ resource_kind }} records</caption>
+    <thead><tr><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
     <tbody>
     {% for record in records %}
       <tr>
         <td>{{ record.name }}</td>
         <td><span class="badge text-bg-{{ 'success' if record.is_active else 'secondary' }}">{{ 'Active' if record.is_active else 'Inactive' }}</span></td>
         <td class="d-flex gap-1">
-          {% set kind = 'class' if record.__class__.__name__ == 'SchoolClass' else 'room' %}
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.edit_' ~ kind, record_id=record.id) }}">Edit</a>
-          <form method="post" action="{{ url_for('admin.' ~ ('activate_' if not record.is_active else 'deactivate_') ~ kind, record_id=record.id) }}" onsubmit="return confirm('Change this {{ kind }} status?')">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.edit_' ~ resource_kind, record_id=record.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('admin.' ~ ('activate_' if not record.is_active else 'deactivate_') ~ resource_kind, record_id=record.id) }}" data-confirm-message="{{ 'Activate ' ~ resource_kind ~ ' ' ~ record.name ~ '?' if not record.is_active else 'Deactivate ' ~ resource_kind ~ ' ' ~ record.name ~ '? Existing history will be preserved.' }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-{{ 'success' if not record.is_active else 'danger' }}" type="submit">{{ 'Activate' if not record.is_active else 'Deactivate' }}</button>
           </form>
         </td>
       </tr>
     {% else %}
-      <tr><td colspan="3" class="text-center text-secondary">No records found.</td></tr>
+      <tr><td colspan="3" class="text-center text-secondary py-4">No records are available.</td></tr>
     {% endfor %}
     </tbody>
   </table>

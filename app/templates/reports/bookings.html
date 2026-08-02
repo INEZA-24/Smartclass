@@ -4,10 +4,10 @@
   <a href="{{ url_for('reports.index') }}">Back to Reports</a>
   <h1 class="mt-2">{{ title }}</h1>
   <form method="get" class="row g-3 align-items-end mb-4">
-    <div class="col-sm-6 col-lg-4"><label class="form-label" for="date">{{ 'Anchor date' if title == 'Weekly Bookings' else 'Date' }}</label><input class="form-control" id="date" name="date" type="date" value="{{ date_value.isoformat() if date_value else '' }}"></div>
+    <div class="col-sm-6 col-lg-4"><label class="form-label" for="date">{{ 'Anchor date' if title == 'Weekly Bookings' else 'Date' }}</label><input class="form-control{% if not filters.valid %} is-invalid{% endif %}" id="date" name="date" type="date" value="{{ date_value.isoformat() if date_value else '' }}"{% if not filters.valid %} aria-invalid="true" aria-describedby="report-filter-errors"{% endif %}></div>
     <div class="col-auto"><button class="btn btn-primary" type="submit">Apply filter</button></div>
   </form>
-  {% for error in filters.errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+  {% if filters.errors %}<div id="report-filter-errors" class="alert alert-danger" role="alert">{% for error in filters.errors %}<span class="d-block">{{ error }}</span>{% endfor %}</div>{% endif %}
   {% if not filters.valid %}
     <p class="alert alert-secondary">Correct the filters above to run this report.</p>
   {% else %}
@@ -16,6 +16,7 @@
     {% if days %}<div class="d-flex flex-wrap gap-2 mb-3">{% for day in days %}<span class="badge text-bg-secondary">{{ day }}: {{ day_counts[day] }}</span>{% endfor %}</div>{% endif %}
     {% if rows %}
     <div class="table-responsive"><table class="table table-striped">
+      <caption class="visually-hidden">{{ title }} results</caption>
       <thead><tr>
         {% if days %}<th scope="col">Date</th>{% endif %}
         <th scope="col">Prep</th><th scope="col">Room</th>

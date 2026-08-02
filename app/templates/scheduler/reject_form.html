@@ -1,16 +1,24 @@
 {% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
 {% block title %}Reject Request | SCMS{% endblock %}
 {% block content %}
   <h1>Reject request</h1>
   <dl class="row">
     <dt class="col-sm-3">Requester</dt><dd class="col-sm-9">{{ request_record.requester.full_name }}</dd>
     <dt class="col-sm-3">Requester role</dt><dd class="col-sm-9">{{ origin_label }}</dd>
-    <dt class="col-sm-3">Priority</dt><dd class="col-sm-9">{{ request_record.priority.value }}</dd>
+    <dt class="col-sm-3">Priority</dt><dd class="col-sm-9">{{ 'High Priority' if request_record.priority.value == 'HIGH' else 'Normal Priority' }}</dd>
     <dt class="col-sm-3">Class</dt><dd class="col-sm-9">{{ request_record.school_class.name }}</dd>
     <dt class="col-sm-3">Responsible Teacher</dt><dd class="col-sm-9">{{ request_record.teacher.full_name }}</dd>
     <dt class="col-sm-3">Subject</dt><dd class="col-sm-9">{{ request_record.subject }}</dd>
     <dt class="col-sm-3">Private reason</dt><dd class="col-sm-9">{{ request_record.reason }}</dd>
     <dt class="col-sm-3">Submitted</dt><dd class="col-sm-9">{{ request_record.created_at }}</dd>
   </dl>
-  <form method="post" class="card card-body">{{ form.hidden_tag() }}{{ form.reason.label(class="form-label") }}{{ form.reason(class="form-control") }}{% for error in form.reason.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}{{ form.submit(class="btn btn-danger mt-3") }}</form>
+  <form method="post" class="card card-body" data-confirm-message="Reject this pending request? The requester will be notified.">
+    {{ form.hidden_tag() }}
+    {{ render_field(form.reason, required=true) }}
+    <div class="d-flex flex-wrap gap-2">
+      {{ form.submit(class="btn btn-danger", value="Reject request") }}
+      <a class="btn btn-outline-secondary" href="{{ url_for('scheduler.pending_queue') }}">Cancel</a>
+    </div>
+  </form>
 {% endblock %}

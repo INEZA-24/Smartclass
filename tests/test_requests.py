@@ -1174,3 +1174,51 @@ def test_edit_form_remains_available_when_queue_locked(client, app):
     assert page.status_code == 200
     assert b"<form" in page.data
     assert b"Edit booking request" in page.data
+
+
+def test_pending_cancel_confirmation_is_safe_post_only_and_authorized(client, app):
+    school_class = make_class(app)
+    teacher_id = make_user(app, "teacher", UserRole.TEACHER)
+    make_user(app, "other-teacher", UserRole.TEACHER)
+    subject = 'Quoted "<Subject>" O\'Neil é'
+    login(client, "teacher")
+    client.post(
+        "/requester/teacher/new",
+        data={
+            "class_id": school_class.id,
+            "subject": subject,
+            "reason": "PRIVATE-CANCEL-CONFIRMATION",
+        },
+    )
+    with app.app_context():
+        record = db.session.scalar(
+            db.select(BookingRequest).where(
+                BookingRequest.requester_id == teacher_id
+            )
+        )
+        request_id = record.id
+        record.rejection_reason = "REJECTION-CONFIRMATION-SENTINEL"
+        db.session.commit()
+    app.config["WTF_CSRF_ENABLED"] = True
+    page = client.get("/requester/teacher/requests")
+    confirmation = page.data.split(b"data-confirm-message=", 1)[1].split(b">", 1)[0]
+    assert b"Cancel pending request" in confirmation
+    assert b"&lt;Subject&gt;" in confirmation
+    assert b"PRIVATE-CANCEL-CONFIRMATION" not in confirmation
+    assert b"REJECTION-CONFIRMATION-SENTINEL" not in confirmation
+    assert b'method="post"' in page.data
+    assert b'name="csrf_token"' in page.data
+    assert client.get(f"/requester/requests/{request_id}/cancel").status_code == 405
+
+    app.config["WTF_CSRF_ENABLED"] = False
+    client.post("/auth/logout")
+    login(client, "other-teacher")
+    assert client.post(f"/requester/requests/{request_id}/cancel").status_code in {
+        403,
+        404,
+    }
+    with app.app_context():
+        assert (
+            db.session.get(BookingRequest, request_id).status
+            == RequestStatus.PENDING
+        )

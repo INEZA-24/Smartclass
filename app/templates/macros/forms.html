@@ -1,0 +1,23 @@
+{% macro render_field(field, required=false, help_text='', autocomplete='', rows=none) -%}
+  {% set help_id = field.id ~ '-help' %}
+  {% set error_id = field.id ~ '-errors' %}
+  {% set described_by = ((help_id if help_text else '') ~ (' ' if help_text and field.errors else '') ~ (error_id if field.errors else '')) %}
+  <div class="mb-3">
+    {{ field.label(class="form-label") }}
+    {% if required %}<span class="small text-body-secondary">(required)</span>{% endif %}
+    {% set control_class = 'form-select' if field.type in ('SelectField', 'SelectMultipleField') else 'form-control' %}
+    {{ field(
+      class=control_class ~ (' is-invalid' if field.errors else ''),
+      autocomplete=autocomplete or false,
+      rows=rows or false,
+      aria_invalid='true' if field.errors else false,
+      aria_describedby=described_by or false
+    ) }}
+    {% if help_text %}<div id="{{ help_id }}" class="form-text">{{ help_text }}</div>{% endif %}
+    {% if field.errors %}
+      <div id="{{ error_id }}" class="invalid-feedback">
+        {% for error in field.errors %}<span class="d-block">{{ error }}</span>{% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{%- endmacro %}

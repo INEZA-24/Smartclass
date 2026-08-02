@@ -2,5 +2,5 @@
 {% block title %}Classes | SCMS{% endblock %}
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3"><h1>Classes</h1><a class="btn btn-primary" href="{{ url_for('admin.create_class') }}">Create class</a></div>
-  {% include "admin/named_list.html" %}
+  {% with resource_kind="class" %}{% include "admin/named_list.html" %}{% endwith %}
 {% endblock %}

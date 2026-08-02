@@ -1,14 +1,11 @@
 {% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
 {% block title %}{{ title }} | SCMS{% endblock %}
 {% block content %}
   <h1>{{ title }}</h1>
   <form method="post" class="card card-body mt-3">
     {{ form.hidden_tag() }}
-    <div class="mb-3">
-      {{ form.name.label(class="form-label") }}
-      {{ form.name(class="form-control") }}
-      {% for error in form.name.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
-    </div>
+    {{ render_field(form.name, required=true) }}
     {% if form.is_active is defined %}
       <div class="form-check mb-3">{{ form.is_active(class="form-check-input") }} {{ form.is_active.label(class="form-check-label") }}</div>
     {% endif %}

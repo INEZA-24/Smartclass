@@ -280,6 +280,109 @@ def test_scheduler_and_admin_create_each_block_scope(
         assert block.reason == "Maintenance\nkeep this line"
 
 
+def test_visible_block_form_preserves_accessible_errors_without_mutation(client, app):
+    ids = seed(app)
+    target = planning_window()[0]
+    login(client, "scheduler")
+    response = client.post(
+        f"/scheduler/schedule/{target.isoformat()}/blocks",
+        data={
+            "scope": "INVALID",
+            "room_id": ids["room"],
+            "prep": PrepPeriod.PREP_1.value,
+            "reason": "Visible submitted value",
+            "block_form_mode": "full",
+        },
+    )
+    assert response.status_code == 200
+    assert b"Correct the highlighted block fields" in response.data
+    assert b'class="form-select is-invalid"' in response.data
+    assert b'aria-invalid="true"' in response.data
+    assert b'aria-describedby="scope-help scope-errors"' in response.data
+    assert b'id="scope-errors"' in response.data
+    assert b"Not a valid choice" in response.data
+    assert b"Visible submitted value" in response.data
+    with app.app_context():
+        assert db.session.scalar(db.select(RoomBlock)) is None
+        assert db.session.scalar(db.select(Notification)) is None
+        assert db.session.scalar(
+            db.select(AuditLog).where(AuditLog.action == "BLOCK_CREATED")
+        ) is None
+
+
+def test_visible_and_compact_block_forms_retain_existing_success_behavior(client, app):
+    ids = seed(app)
+    target = planning_window()[0]
+    login(client, "admin")
+    valid = client.post(
+        f"/scheduler/schedule/{target.isoformat()}/blocks",
+        data={
+            "scope": BlockScope.SLOT.value,
+            "room_id": ids["room"],
+            "prep": PrepPeriod.PREP_1.value,
+            "reason": "Maintenance",
+            "block_form_mode": "full",
+        },
+    )
+    assert valid.status_code == 302
+    compact_invalid = client.post(
+        f"/scheduler/schedule/{target.isoformat()}/blocks",
+        data={
+            "scope": "INVALID",
+            "room_id": ids["room"],
+            "prep": "",
+            "submit": "Fake compact submit",
+        },
+    )
+    assert compact_invalid.status_code == 302
+
+
+def test_full_marker_is_absent_from_compact_slot_forms(client, app):
+    seed(app)
+    target = planning_window()[0]
+    login(client, "scheduler")
+    response = client.get(f"/scheduler/schedule/{target.isoformat()}")
+    assert response.status_code == 200
+    assert response.data.count(b'name="block_form_mode" value="full"') == 1
+    compact_form = response.data.split(b'name="scope" value="SLOT"', 1)[0].rsplit(
+        b"<form", 1
+    )[1]
+    assert b"block_form_mode" not in compact_form
+
+
+def test_block_removal_confirmation_is_safe_post_only_and_authorized(client, app):
+    ids = seed(app)
+    target = planning_window()[0]
+    with app.app_context():
+        block = RoomBlock(
+            block_date=target,
+            scope=BlockScope.DAY,
+            reason="PRIVATE-INTERNAL-BLOCK-REASON",
+            created_by_id=ids["scheduler"],
+        )
+        db.session.add(block)
+        db.session.commit()
+        block_id = block.id
+    login(client, "admin")
+    app.config["WTF_CSRF_ENABLED"] = True
+    page = client.get(f"/scheduler/schedule/{target.isoformat()}")
+    confirmation = page.data.split(b"data-confirm-message=", 1)[1].split(b">", 1)[0]
+    assert b"day availability block" in confirmation
+    assert target.isoformat().encode() in confirmation
+    assert b"PRIVATE-INTERNAL-BLOCK-REASON" not in confirmation
+    assert b'method="post"' in page.data
+    assert b'name="csrf_token"' in page.data
+    assert client.get(f"/scheduler/blocks/{block_id}/remove").status_code == 405
+
+    app.config["WTF_CSRF_ENABLED"] = False
+    client.post("/auth/logout")
+    login(client, "teacher")
+    assert client.post(f"/scheduler/blocks/{block_id}/remove").status_code == 403
+    client.post("/auth/logout")
+    login(client, "admin")
+    assert client.post(f"/scheduler/blocks/{block_id}/remove").status_code == 302
+
+
 @pytest.mark.parametrize("username", ["teacher", "monitor"])
 def test_requesters_cannot_block(client, app, username):
     ids = seed(app)

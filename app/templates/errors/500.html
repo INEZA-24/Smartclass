@@ -1,0 +1,12 @@
+{% extends "errors/base.html" %}
+{% block title %}Something Went Wrong | SCMS{% endblock %}
+{% block content %}
+  <section class="card error-card mx-auto text-center" aria-labelledby="error-heading">
+    <div class="card-body p-4 p-md-5">
+      <p class="text-danger fw-semibold">Error 500</p>
+      <h1 id="error-heading" class="h2">Something went wrong</h1>
+      <p class="text-body-secondary">We could not complete this request. Please try again later.</p>
+      <a class="btn btn-primary" href="{{ url_for('public.home') }}">Return to the public schedule</a>
+    </div>
+  </section>
+{% endblock %}

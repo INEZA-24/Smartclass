@@ -604,3 +604,47 @@ def test_report_routes_do_not_modify_audit_history(client, app):
     with app.app_context():
         after = db.session.scalar(db.select(db.func.count()).select_from(AuditLog))
     assert after == before
+
+
+@pytest.mark.parametrize(
+    ("path", "valid_query", "invalid_query", "control_id"),
+    [
+        ("daily", "date=2026-08-01", "date=invalid", "date"),
+        ("weekly", "date=2026-08-05", "date=invalid", "date"),
+        ("history", "status=PENDING", "status=INVALID", "status"),
+        (
+            "rooms",
+            "start_date=2026-08-01&end_date=2026-08-02",
+            "start_date=invalid&end_date=2026-08-02",
+            "start_date",
+        ),
+        (
+            "classes",
+            "start_date=2026-08-01&end_date=2026-08-02",
+            "start_date=invalid&end_date=2026-08-02",
+            "start_date",
+        ),
+    ],
+)
+def test_report_filter_accessibility_states(
+    client, app, path, valid_query, invalid_query, control_id
+):
+    seed(app)
+    login(client, "admin")
+    valid = client.get(f"/reports/{path}?{valid_query}")
+    assert valid.status_code == 200
+    assert b'id="report-filter-errors"' not in valid.data
+
+    invalid = client.get(f"/reports/{path}?{invalid_query}")
+    assert invalid.status_code == 200
+    assert b'id="report-filter-errors"' in invalid.data
+    assert (
+        f'id="{control_id}"'.encode() in invalid.data
+        and b'aria-invalid="true"' in invalid.data
+        and b'aria-describedby="report-filter-errors"' in invalid.data
+    )
+    assert b"Correct the filters above to run this report." in invalid.data
+    report_form = invalid.data.split(b'<form method="get"', 1)[1].split(
+        b"</form>", 1
+    )[0]
+    assert b"csrf_token" not in report_form

@@ -6,7 +6,7 @@
       <h1 class="mb-1">Notifications</h1>
       <p class="text-body-secondary mb-0">{{ unread_count }} unread</p>
     </div>
-    <form method="post" action="{{ url_for('notifications.mark_all_read') }}">
+    <form method="post" action="{{ url_for('notifications.mark_all_read') }}" data-confirm-message="Mark all your notifications as read?">
       {{ action_form.hidden_tag() }}
       <button class="btn btn-outline-primary" type="submit">Mark all as read</button>
     </form>
@@ -27,7 +27,7 @@
                 {% if not notification.is_read %}
                   <span class="badge text-bg-primary">Unread</span>
                 {% else %}
-                  <span class="visually-hidden">Read</span>
+                  <span class="badge text-bg-light">Read</span>
                 {% endif %}
               </div>
               <p class="my-2">{{ notification.message }}</p>

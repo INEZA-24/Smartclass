@@ -1,23 +1,16 @@
 {% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
 {% block title %}{{ title }} | SCMS{% endblock %}
 {% block content %}
   <h1>{{ title }}</h1>
   <form method="post" class="card card-body mt-3">
     {{ form.hidden_tag() }}
     {% for field in [form.full_name, form.username, form.role, form.class_id] %}
-      <div class="mb-3">
-        {{ field.label(class="form-label") }}
-        {{ field(class="form-control" if field.type != "SelectField" else "form-select") }}
-        {% for error in field.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
-      </div>
+      {{ render_field(field, required=field.name != 'class_id', autocomplete='username' if field.name == 'username' else '') }}
     {% endfor %}
     {% if form.temporary_password is defined %}
       {% for field in [form.temporary_password, form.confirm_password] %}
-        <div class="mb-3">
-          {{ field.label(class="form-label") }}
-          {{ field(class="form-control") }}
-          {% for error in field.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
-        </div>
+        {{ render_field(field, required=true, autocomplete='new-password') }}
       {% endfor %}
     {% endif %}
     <div class="form-check mb-3">{{ form.is_active(class="form-check-input") }} {{ form.is_active.label(class="form-check-label") }}</div>

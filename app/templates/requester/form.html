@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
 {% block title %}{{ "Edit" if editing else "New" }} Request | SCMS{% endblock %}
 {% block content %}
   <h1>{{ "Edit" if editing else "New" }} booking request</h1>
@@ -12,14 +13,14 @@
     <form method="post" class="card card-body">
       {{ form.hidden_tag() }}
       {% if form.class_id is defined %}
-        <div class="mb-3">{{ form.class_id.label(class="form-label") }}{{ form.class_id(class="form-select") }}{% for error in form.class_id.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
+        {{ render_field(form.class_id, required=true) }}
       {% endif %}
       {% if form.teacher_id is defined %}
-        <div class="mb-3">{{ form.teacher_id.label(class="form-label") }}{{ form.teacher_id(class="form-select") }}{% for error in form.teacher_id.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
+        {{ render_field(form.teacher_id, required=true) }}
       {% endif %}
-      <div class="mb-3">{{ form.subject.label(class="form-label") }}{{ form.subject(class="form-control") }}{% for error in form.subject.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
-      <div class="mb-3">{{ form.reason.label(class="form-label") }}{{ form.reason(class="form-control", rows=4) }}{% for error in form.reason.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
-      {{ form.submit(class="btn btn-primary") }}
+      {{ render_field(form.subject, required=true) }}
+      {{ render_field(form.reason, required=true, help_text='This reason is private and visible only to authorized staff.', rows=4) }}
+      <div class="d-flex flex-wrap gap-2">{{ form.submit(class="btn btn-primary") }}<a class="btn btn-outline-secondary" href="{{ url_for('requester.teacher_requests' if current_user.role.value == 'TEACHER' else 'requester.monitor_requests') }}">Cancel</a></div>
     </form>
   {% endif %}
 {% endblock %}

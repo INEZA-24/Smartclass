@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ role_label }} Dashboard | SCMS{% endblock %}
 {% block content %}
-<div class="card shadow-sm"><div class="card-body p-4">
+<section class="card"><div class="card-body p-4 p-md-5">
   <h1 class="h3">{{ role_label }} Dashboard</h1>
-  <p class="mb-0">Welcome, {{ user.full_name }}.</p>
-</div></div>
+  <p>Welcome, {{ user.full_name }}. Submit a Smart Class request, then follow its progress in your request history.</p>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-primary" href="{{ url_for('requester.teacher_new' if user.role.value == 'TEACHER' else 'requester.monitor_new') }}">New request</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('requester.teacher_requests' if user.role.value == 'TEACHER' else 'requester.monitor_requests') }}">Request history</a>
+  </div>
+</div></section>
 {% endblock %}

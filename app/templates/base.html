@@ -3,61 +3,82 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#123c69">
     <title>{% block title %}Smart Class Management System{% endblock %}</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
-      crossorigin="anonymous"
-    >
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   </head>
   <body class="bg-body-tertiary">
-    <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="dark">
-      <div class="container">
-        <a class="navbar-brand" href="{{ url_for('public.home') }}">SCMS</a>
-        <div class="ms-auto d-flex align-items-center gap-3 text-white">
-          {% if current_user.is_authenticated %}
-            {% if not current_user.must_change_password %}<a class="nav-link" href="{{ url_for('notifications.index') }}">Notifications{% if notification_unread_count %} <span class="badge text-bg-light">{{ notification_unread_count }}</span>{% endif %}</a>{% endif %}
-            {% if current_user.role.value == "ADMIN" and not current_user.must_change_password %}
-              <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Dashboard</a>
-              <a class="nav-link" href="{{ url_for('admin.users') }}">Users</a>
-              <a class="nav-link" href="{{ url_for('admin.classes') }}">Classes</a>
-              <a class="nav-link" href="{{ url_for('admin.rooms') }}">Rooms</a>
-              <a class="nav-link" href="{{ url_for('scheduler.schedule_index') }}">Schedule</a>
-              <a class="nav-link" href="{{ url_for('reports.index') }}">Reports</a>
-            {% elif current_user.role.value in ["TEACHER", "MONITOR"] and not current_user.must_change_password %}
-              <a class="nav-link" href="{{ dashboard_url() }}">Dashboard</a>
-              <a class="nav-link" href="{{ url_for('requester.teacher_new' if current_user.role.value == 'TEACHER' else 'requester.monitor_new') }}">New Request</a>
-              <a class="nav-link" href="{{ url_for('requester.teacher_requests' if current_user.role.value == 'TEACHER' else 'requester.monitor_requests') }}">My Requests</a>
-            {% elif current_user.role.value == "SCHEDULER" and not current_user.must_change_password %}
-              <a class="nav-link" href="{{ dashboard_url() }}">Dashboard</a>
-              <a class="nav-link" href="{{ url_for('scheduler.pending_queue') }}">Pending Queue</a>
-              <a class="nav-link" href="{{ url_for('scheduler.schedule_index') }}">Schedule</a>
-              <a class="nav-link" href="{{ url_for('reports.index') }}">Reports</a>
-            {% else %}
-              <a class="nav-link" href="{{ dashboard_url() }}">Dashboard</a>
-            {% endif %}
-            <span>{{ current_user.full_name }}</span>
-            <form method="post" action="{{ url_for('auth.logout') }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
-            </form>
-          {% else %}
-            <a class="nav-link" href="{{ url_for('auth.login') }}">Login</a>
-          {% endif %}
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <header>
+      <nav class="navbar navbar-expand-lg navbar-dark app-navbar" aria-label="Primary navigation">
+        <div class="container-xl">
+          <a class="navbar-brand" href="{{ url_for('public.home') }}">
+            <span class="brand-school">College Saint André</span>
+            <span class="brand-app">Smart Class Management System</span>
+          </a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#primaryNavigation" aria-controls="primaryNavigation" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="primaryNavigation">
+            <div class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+              {% set endpoint = request.endpoint or '' %}
+              {% if current_user.is_authenticated %}
+                {% if not current_user.must_change_password %}
+                  {% if current_user.role.value == 'ADMIN' %}
+                    {% set nav_items = [('admin.dashboard', 'Dashboard'), ('admin.users', 'Users'), ('admin.classes', 'Classes'), ('admin.rooms', 'Rooms'), ('scheduler.schedule_index', 'Schedule'), ('reports.index', 'Reports')] %}
+                  {% elif current_user.role.value == 'SCHEDULER' %}
+                    {% set nav_items = [('scheduler.dashboard', 'Dashboard'), ('scheduler.pending_queue', 'Pending requests'), ('scheduler.schedule_index', 'Schedule'), ('reports.index', 'Reports')] %}
+                  {% else %}
+                    {% set requester_role = current_user.role.value %}
+                    {% set nav_items = [(requester_role == 'TEACHER' and 'requester.teacher_dashboard' or 'requester.monitor_dashboard', 'Dashboard'), (requester_role == 'TEACHER' and 'requester.teacher_new' or 'requester.monitor_new', 'New request'), (requester_role == 'TEACHER' and 'requester.teacher_requests' or 'requester.monitor_requests', 'Request history')] %}
+                  {% endif %}
+                  {% for target, label in nav_items %}
+                    {% set active = endpoint == target
+                      or (target == 'admin.users' and endpoint in ('admin.create_user', 'admin.edit_user', 'admin.reset_temporary_password'))
+                      or (target == 'admin.classes' and endpoint in ('admin.create_class', 'admin.edit_class'))
+                      or (target == 'admin.rooms' and endpoint in ('admin.create_room', 'admin.edit_room'))
+                      or (target == 'scheduler.pending_queue' and endpoint in ('scheduler.schedule_pending_request', 'scheduler.reject_pending_request'))
+                      or (target == 'scheduler.schedule_index' and endpoint in ('scheduler.day_schedule', 'scheduler.booking_detail', 'scheduler.reschedule', 'scheduler.cancel_scheduled', 'scheduler.add_block', 'scheduler.unblock'))
+                      or (target in ('requester.teacher_new', 'requester.monitor_new') and endpoint == target)
+                      or (target in ('requester.teacher_requests', 'requester.monitor_requests') and endpoint in ('requester.teacher_edit', 'requester.monitor_edit', 'requester.teacher_cancel', 'requester.monitor_cancel'))
+                      or (target == 'reports.index' and endpoint.startswith('reports.')) %}
+                    <a class="nav-link{% if active %} active{% endif %}" href="{{ url_for(target) }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
+                  {% endfor %}
+                  <a class="nav-link{% if endpoint.startswith('notifications.') %} active{% endif %}" href="{{ url_for('notifications.index') }}"{% if endpoint.startswith('notifications.') %} aria-current="page"{% endif %}>
+                    Notifications{% if notification_unread_count %}<span class="badge rounded-pill text-bg-light ms-1" aria-label="{{ notification_unread_count }} unread notifications">{{ notification_unread_count }}</span>{% endif %}
+                  </a>
+                {% endif %}
+                <div class="navbar-user ms-lg-2 py-2 py-lg-0">
+                  <span class="d-block fw-semibold">{{ current_user.full_name }}</span>
+                  <span class="d-block small">{{ {'ADMIN': 'Administrator', 'SCHEDULER': 'Patron/Matron', 'TEACHER': 'Teacher', 'MONITOR': 'Class Monitor'}[current_user.role.value] }}</span>
+                </div>
+                <form class="ms-lg-2" method="post" action="{{ url_for('auth.logout') }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
+                </form>
+              {% else %}
+                <a class="nav-link{% if endpoint == 'auth.login' %} active{% endif %}" href="{{ url_for('auth.login') }}"{% if endpoint == 'auth.login' %} aria-current="page"{% endif %}>Login</a>
+              {% endif %}
+            </div>
+          </div>
         </div>
+      </nav>
+    </header>
+    <main id="main-content" class="container-xl py-4 py-md-5" tabindex="-1">
+      <div class="flash-region" aria-live="polite" aria-atomic="true">
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+          {% set alert_category = {'danger': 'danger', 'error': 'danger', 'warning': 'warning', 'success': 'success', 'info': 'info'}.get(category, 'info') %}
+          <div class="alert alert-{{ alert_category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss message"></button>
+          </div>
+        {% endfor %}
       </div>
-    </nav>
-    <main class="container py-5">
-      {% for category, message in get_flashed_messages(with_categories=true) %}
-        <div class="alert alert-{{ category }}">{{ message }}</div>
-      {% endfor %}
       {% block content %}{% endblock %}
     </main>
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-      crossorigin="anonymous"
-    ></script>
+    <footer class="container-xl pb-4 text-center text-body-secondary small">College Saint André · Smart Class Management System</footer>
+    <script defer src="{{ url_for('static', filename='confirm.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
   </body>
 </html>

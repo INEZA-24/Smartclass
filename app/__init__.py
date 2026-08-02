@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, g, redirect, render_template, request, url_for
 from flask_login import current_user, logout_user
 
 from app.authz import dashboard_url
@@ -63,7 +63,11 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
 
     @app.context_processor
     def notification_navigation():
-        if not current_user.is_authenticated or current_user.must_change_password:
+        if (
+            getattr(g, "rendering_error", False)
+            or not current_user.is_authenticated
+            or current_user.must_change_password
+        ):
             return {"notification_unread_count": 0}
         count = db.session.scalar(
             db.select(db.func.count())
@@ -95,6 +99,22 @@ def create_app(config: str | dict[str, Any] | None = None) -> Flask:
 
     @app.errorhandler(403)
     def forbidden(_error):
+        g.rendering_error = True
         return render_template("errors/403.html"), 403
+
+    @app.errorhandler(404)
+    def not_found(_error):
+        g.rendering_error = True
+        return render_template("errors/404.html"), 404
+
+    @app.errorhandler(500)
+    def internal_server_error(_error):
+        g.rendering_error = True
+        try:
+            db.session.rollback()
+        except Exception:  # Session cleanup must not prevent the safe response.
+            pass
+        template = app.jinja_env.get_template("errors/500.html")
+        return template.render(), 500
 
     return app

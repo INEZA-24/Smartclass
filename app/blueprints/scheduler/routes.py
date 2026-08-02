@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from flask import abort, flash, redirect, render_template, url_for
+from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -144,8 +144,12 @@ def schedule_index():
 @roles_required(UserRole.ADMIN, UserRole.SCHEDULER)
 def day_schedule(date_value):
     selected_date = _parse_date(date_value)
+    return _render_day_schedule(selected_date)
+
+
+def _render_day_schedule(selected_date, block_form=None):
     rooms, states = slot_states(selected_date)
-    form = BlockForm()
+    form = block_form if block_form is not None else BlockForm()
     form.scope.choices = [
         (item.value, item.value.replace("_", " ").title()) for item in BlockScope
     ]
@@ -218,6 +222,9 @@ def add_block(date_value):
     form.prep.choices = _prep_choices(blank=True)
     if not form.validate_on_submit():
         flash("Correct the block form and try again.", "danger")
+        if request.form.get("block_form_mode") == "full":
+            db.session.rollback()
+            return _render_day_schedule(selected_date, block_form=form)
         return redirect(
             url_for("scheduler.day_schedule", date_value=selected_date.isoformat())
         )

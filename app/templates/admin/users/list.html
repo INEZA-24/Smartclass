@@ -7,7 +7,8 @@
   </div>
   <div class="table-responsive">
     <table class="table table-striped align-middle">
-      <thead><tr><th>Full name</th><th>Username</th><th>Role</th><th>Class</th><th>Status</th><th>Password</th><th>Actions</th></tr></thead>
+      <caption class="visually-hidden">Administrator user accounts</caption>
+      <thead><tr><th scope="col">Full name</th><th scope="col">Username</th><th scope="col">Role</th><th scope="col">Class</th><th scope="col">Status</th><th scope="col">Password</th><th scope="col">Actions</th></tr></thead>
       <tbody>
       {% for user in users %}
         <tr>
@@ -16,14 +17,14 @@
           <td>{{ role_labels[user.role] }}</td>
           <td>{{ user.school_class.name if user.school_class else "-" }}</td>
           <td><span class="badge text-bg-{{ 'success' if user.is_active else 'secondary' }}">{{ 'Active' if user.is_active else 'Inactive' }}</span></td>
-          <td><span class="badge text-bg-{{ 'warning' if user.must_change_password else 'success' }}">{{ 'Change required' if user.must_change_password else 'Current' }}</span></td>
+          <td><span class="badge text-bg-{{ 'warning' if user.must_change_password else 'success' }}">{{ 'Password change required' if user.must_change_password else 'Password current' }}</span></td>
           <td>
             <div class="d-flex flex-wrap gap-1">
               <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.edit_user', user_id=user.id) }}">Edit</a>
               {% if user.id != current_user.id %}
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.reset_temporary_password', user_id=user.id) }}">Temporary password</a>
               {% endif %}
-              <form method="post" action="{{ url_for('admin.activate_user' if not user.is_active else 'admin.deactivate_user', user_id=user.id) }}" onsubmit="return confirm('Change this user status?')">
+              <form method="post" action="{{ url_for('admin.activate_user' if not user.is_active else 'admin.deactivate_user', user_id=user.id) }}" data-confirm-message="{{ 'Activate user ' ~ user.full_name ~ ' and restore account access?' if not user.is_active else 'Deactivate user ' ~ user.full_name ~ '? Account access will stop immediately.' }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-{{ 'success' if not user.is_active else 'danger' }}" type="submit">{{ 'Activate' if not user.is_active else 'Deactivate' }}</button>
               </form>
@@ -31,7 +32,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="7" class="text-center text-secondary">No users found.</td></tr>
+        <tr><td colspan="7" class="text-center text-secondary py-4">No user accounts have been created.</td></tr>
       {% endfor %}
       </tbody>
     </table>

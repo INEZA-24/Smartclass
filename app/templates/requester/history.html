@@ -4,12 +4,13 @@
   <h1>My requests</h1>
   {% if settings %}<p>Pending queue: {{ pending_count }}/{{ settings.max_pending_requests }} — {{ "Locked" if settings.booking_queue_locked else "Open" }}</p>{% endif %}
   <div class="table-responsive"><table class="table table-striped align-middle">
-    <thead><tr><th>Class</th><th>Teacher</th><th>Subject</th><th>Private reason</th><th>Priority</th><th>Status</th><th>Created</th><th>Updated</th><th>Actions</th></tr></thead>
+    <caption class="visually-hidden">Your Smart Class booking requests</caption>
+    <thead><tr><th scope="col">Class</th><th scope="col">Teacher</th><th scope="col">Subject</th><th scope="col">Private reason</th><th scope="col">Priority</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col">Updated</th><th scope="col">Actions</th></tr></thead>
     <tbody>{% for item in requests %}<tr>
       <td>{{ item.school_class.name }}</td><td>{{ item.teacher.full_name }}</td><td>{{ item.subject }}</td><td>{{ item.reason }}</td>
-      <td><span class="badge text-bg-{{ 'danger' if item.priority.value == 'HIGH' else 'secondary' }}">{{ item.priority.value }}</span></td>
-      <td><span class="badge text-bg-info">{{ item.status.value }}</span></td><td>{{ item.created_at }}</td><td>{{ item.updated_at }}</td>
-      <td>{% if item.status.value == 'PENDING' %}<div class="d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('requester.teacher_edit' if current_user.role.value == 'TEACHER' else 'requester.monitor_edit', request_id=item.id) }}">Edit</a><form method="post" action="{{ url_for('requester.teacher_cancel' if current_user.role.value == 'TEACHER' else 'requester.monitor_cancel', request_id=item.id) }}" onsubmit="return confirm('Cancel this request?')">{{ cancel_form.hidden_tag() }}<button class="btn btn-sm btn-outline-danger">Cancel</button></form></div>{% endif %}</td>
+      <td><span class="badge text-bg-{{ 'danger' if item.priority.value == 'HIGH' else 'secondary' }}">{{ 'High Priority' if item.priority.value == 'HIGH' else 'Normal Priority' }}</span></td>
+      <td><span class="badge text-bg-info">{{ item.status.value.title() }}</span></td><td>{{ item.created_at }}</td><td>{{ item.updated_at }}</td>
+      <td>{% if item.status.value == 'PENDING' %}<div class="d-flex flex-wrap gap-1"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('requester.teacher_edit' if current_user.role.value == 'TEACHER' else 'requester.monitor_edit', request_id=item.id) }}">Edit request</a><form method="post" action="{{ url_for('requester.teacher_cancel' if current_user.role.value == 'TEACHER' else 'requester.monitor_cancel', request_id=item.id) }}" data-confirm-message="Cancel pending request for {{ item.subject }}? This action cannot be undone.">{{ cancel_form.hidden_tag() }}<button class="btn btn-sm btn-outline-danger" type="submit">Cancel request</button></form></div>{% endif %}</td>
     </tr>{% else %}<tr><td colspan="9" class="text-center">No requests yet.</td></tr>{% endfor %}</tbody>
   </table></div>
 {% endblock %}

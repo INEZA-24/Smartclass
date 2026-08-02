@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found | SCMS{% endblock %}
+{% block content %}
+  <section class="card error-card mx-auto text-center" aria-labelledby="error-heading">
+    <div class="card-body p-4 p-md-5">
+      <p class="text-primary fw-semibold">Error 404</p>
+      <h1 id="error-heading" class="h2">Page not found</h1>
+      <p class="text-body-secondary">The page or record could not be found. It may have moved or may not be available to you.</p>
+      <a class="btn btn-primary" href="{{ dashboard_url() if current_user.is_authenticated else url_for('public.home') }}">Return to a safe page</a>
+    </div>
+  </section>
+{% endblock %}

@@ -2,5 +2,5 @@
 {% block title %}Rooms | SCMS{% endblock %}
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3"><h1>Rooms</h1><a class="btn btn-primary" href="{{ url_for('admin.create_room') }}">Create room</a></div>
-  {% include "admin/named_list.html" %}
+  {% with resource_kind="room" %}{% include "admin/named_list.html" %}{% endwith %}
 {% endblock %}

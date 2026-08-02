@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% from "macros/forms.html" import render_field %}
 {% block title %}Schedule Request | SCMS{% endblock %}
 {% block content %}
   <h1>Schedule Pending request</h1>
   <dl class="row">
     <dt class="col-sm-3">Requester</dt><dd class="col-sm-9">{{ request_record.requester.full_name }} ({{ origin_label }})</dd>
-    <dt class="col-sm-3">Priority</dt><dd class="col-sm-9">{{ request_record.priority.value }}</dd>
+    <dt class="col-sm-3">Priority</dt><dd class="col-sm-9"><span class="badge text-bg-{{ 'danger' if request_record.priority.value == 'HIGH' else 'secondary' }}">{{ 'High Priority' if request_record.priority.value == 'HIGH' else 'Normal Priority' }}</span></dd>
     <dt class="col-sm-3">Class</dt><dd class="col-sm-9">{{ request_record.school_class.name }}</dd>
     <dt class="col-sm-3">Responsible Teacher</dt><dd class="col-sm-9">{{ request_record.teacher.full_name }}</dd>
     <dt class="col-sm-3">Subject</dt><dd class="col-sm-9">{{ request_record.subject }}</dd>
@@ -14,7 +15,7 @@
   <form method="post" class="card card-body">
     {{ form.hidden_tag() }}
     {% for field in [form.schedule_date, form.prep, form.room_id] %}
-      <div class="mb-3">{{ field.label(class="form-label") }}{{ field(class="form-select" if field.type == "SelectField" else "form-control") }}{% for error in field.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>
+      {{ render_field(field, required=true) }}
     {% endfor %}
     {{ form.submit(class="btn btn-primary") }}
   </form>

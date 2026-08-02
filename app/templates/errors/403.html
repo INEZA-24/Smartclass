@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Access Denied | SCMS{% endblock %}
 {% block content %}
-<div class="alert alert-danger"><h1 class="h3">Access denied</h1><p class="mb-0">You do not have permission to access this page.</p></div>
+<section class="card error-card mx-auto text-center" aria-labelledby="error-heading">
+  <div class="card-body p-4 p-md-5">
+    <p class="text-danger fw-semibold">Error 403</p>
+    <h1 id="error-heading" class="h2">Access denied</h1>
+    <p class="text-body-secondary">You are not authorized to access this page.</p>
+    <a class="btn btn-primary" href="{{ dashboard_url() if current_user.is_authenticated else url_for('public.home') }}">Return to a safe page</a>
+  </div>
+</section>
 {% endblock %}

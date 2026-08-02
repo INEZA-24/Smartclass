@@ -43,7 +43,7 @@ def scheduled_on_fixed_date(app):
 def test_public_schedule_requires_no_login_and_has_empty_state(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert b"College Saint Andre" in response.data
+    assert "College Saint André" in response.get_data(as_text=True)
     assert b"No Smart Class sessions are scheduled for today." in response.data
     assert b"Login" in response.data
     assert b"Notifications" not in response.data
