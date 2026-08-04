@@ -29,14 +29,43 @@ def test_public_layout_is_responsive_and_contains_no_private_navigation(client):
         b'name="viewport"',
         b'href="#main-content"',
         b'id="main-content"',
-        b'class="navbar-toggler"',
-        b'aria-label="Toggle navigation"',
+        b'class="public-secondary-links"',
+        b'class="public-button public-button-primary public-login"',
         b'href="/auth/login"',
     ):
         assert markup in response.data
     for private_link in (b">Users<", b">Reports<", b">Notifications<", b">Logout<"):
         assert private_link not in response.data
     assert "College Saint André" in response.get_data(as_text=True)
+
+
+def test_anonymous_public_header_shows_only_login_action(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'href="/auth/login">Login</a>' in html
+    assert ">Dashboard</a>" not in html
+    assert ">Logout</button>" not in html
+
+
+@pytest.mark.parametrize(
+    ("role", "dashboard_path"),
+    [
+        (UserRole.ADMIN, "/admin/"),
+        (UserRole.SCHEDULER, "/scheduler/"),
+        (UserRole.TEACHER, "/requester/teacher"),
+        (UserRole.MONITOR, "/requester/monitor"),
+    ],
+)
+def test_authenticated_public_header_has_role_dashboard_and_secure_logout(
+    client, app, role, dashboard_path
+):
+    create_user(app, role=role)
+    login(client, username=role.value.lower())
+    html = client.get("/").get_data(as_text=True)
+    assert f'href="{dashboard_path}">Dashboard</a>' in html
+    assert 'method="post" action="/auth/logout"' in html
+    assert 'name="csrf_token"' in html
+    assert ">Logout</button>" in html
+    assert 'href="/auth/login">Login</a>' not in html
 
 
 @pytest.mark.parametrize(
@@ -130,6 +159,13 @@ def test_user_status_confirmation_is_safe_identified_post_and_csrf(client, app):
 
 def test_stylesheet_contains_focus_mobile_and_reduced_motion_rules(client):
     response = client.get("/static/app.css")
+    assert response.status_code == 200
+    for rule in (b":focus-visible", b"@media (max-width", b"prefers-reduced-motion"):
+        assert rule in response.data
+
+
+def test_public_stylesheet_contains_accessibility_and_responsive_rules(client):
+    response = client.get("/static/public-home.css")
     assert response.status_code == 200
     for rule in (b":focus-visible", b"@media (max-width", b"prefers-reduced-motion"):
         assert rule in response.data

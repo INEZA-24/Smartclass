@@ -43,10 +43,25 @@ def scheduled_on_fixed_date(app):
 def test_public_schedule_requires_no_login_and_has_empty_state(client):
     response = client.get("/")
     assert response.status_code == 200
+    assert "Smart Class Management System" in response.get_data(as_text=True)
     assert "College Saint André" in response.get_data(as_text=True)
-    assert b"No Smart Class sessions are scheduled for today." in response.data
+    assert b"No sessions scheduled today" in response.data
+    assert b"The Smart Classes are currently available." in response.data
     assert b"Login" in response.data
     assert b"Notifications" not in response.data
+
+
+def test_public_landing_page_uses_existing_login_and_local_hero(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b'Login</a>' in response.data
+    assert b'href="/auth/login"' in response.data
+    assert b'src="/static/images/smartclass-hero.webp"' in response.data
+    assert b'width="3840"' in response.data
+    assert b'height="3072"' in response.data
+    assert b'loading="eager"' in response.data
+    assert b'fetchpriority="high"' in response.data
+    assert b"Product design and development by INEZA Fidele" in response.data
 
 
 @pytest.mark.parametrize("offset", [-1, 1])
@@ -58,7 +73,7 @@ def test_public_schedule_excludes_other_dates(client, app, offset):
         db.session.commit()
     response = client.get("/")
     assert b"S1 A" not in response.data
-    assert b"No Smart Class sessions are scheduled for today." in response.data
+    assert b"No sessions scheduled today" in response.data
 
 
 @pytest.mark.parametrize("active", [False])

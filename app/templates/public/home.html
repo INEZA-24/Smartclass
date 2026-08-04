@@ -1,24 +1,154 @@
-{% extends "base.html" %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#ffffff">
+    <title>Today's Smart Class Schedule | College Saint André</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ url_for('static', filename='public-home.css') }}">
+  </head>
+  <body class="public-page">
+    <a class="public-skip-link" href="#main-content">Skip to main content</a>
+    <header class="public-header">
+      <nav class="container-xl public-nav" aria-label="Public navigation">
+        <a class="public-brand" href="{{ url_for('public.home') }}" aria-label="Smart Class Management System home">
+          <span>Smart Class Management System</span><small>College Saint André</small>
+        </a>
+        <div class="public-nav-actions">
+          {% if current_user.is_authenticated %}
+            <a class="public-button public-button-secondary" href="{{ dashboard_url() }}">Dashboard</a>
+            <form class="public-logout-form" method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="public-button public-button-primary" type="submit">Logout</button>
+            </form>
+          {% else %}
+            <div class="public-secondary-links">
+              <a href="#how-it-works">How it works</a><a href="#user-guide">User guide</a><a href="#todays-schedule">Today's schedule</a>
+            </div>
+            <a class="public-button public-button-primary public-login" href="{{ url_for('auth.login') }}">Login</a>
+          {% endif %}
+        </div>
+      </nav>
+    </header>
 
-{% block title %}Today's Smart Class Schedule | College Saint André{% endblock %}
+    <main id="main-content" tabindex="-1">
+      {% set messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="container-xl public-flash-region" aria-live="polite" aria-atomic="true">
+          {% for category, message in messages %}
+            {% set alert_category = {'danger': 'danger', 'error': 'danger', 'warning': 'warning', 'success': 'success', 'info': 'info'}.get(category, 'info') %}
+            <div class="alert alert-{{ alert_category }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss message"></button></div>
+          {% endfor %}
+        </div>
+      {% endif %}
 
-{% block content %}
-  <section class="p-4 p-md-5 bg-white rounded-3 shadow-sm" aria-labelledby="public-schedule-heading">
-    <div class="text-center mb-4">
-      <h1 id="public-schedule-heading" class="display-6 fw-semibold">College Saint André</h1>
-      <p class="text-body-secondary mb-1">Smart Class Management System</p>
-      <p class="lead mb-1">Today's Smart Class Schedule</p>
-      <time datetime="{{ schedule_date.isoformat() }}">{{ schedule_date.strftime("%A, %d %B %Y") }}</time>
-    </div>
-    {% set total = namespace(value=0) %}
-    {% for prep, bookings in schedule.items() %}{% set total.value = total.value + bookings|length %}{% if bookings %}
-      <section class="mb-4" aria-labelledby="prep-{{ loop.index }}-heading">
-        <h2 id="prep-{{ loop.index }}-heading" class="h4">{{ prep_labels[prep] }}</h2>
-        <div class="table-responsive"><table class="table table-striped align-middle"><caption class="visually-hidden">{{ prep_labels[prep] }} Smart Class sessions for {{ schedule_date }}</caption><thead><tr><th scope="col">Room</th><th scope="col">Class</th><th scope="col">Responsible Teacher</th></tr></thead><tbody>
-          {% for booking in bookings %}<tr><th scope="row">{{ booking.room_name }}</th><td>{{ booking.class_name }}</td><td>{{ booking.teacher_name }}</td></tr>{% endfor %}
-        </tbody></table></div>
+      <section class="public-hero" aria-labelledby="hero-heading">
+        <div class="container-xl public-hero-grid">
+          <div class="public-hero-copy">
+            <p class="public-eyebrow">Smart Class Management</p>
+            <h1 id="hero-heading">From paper requests to a <span>clear daily schedule.</span></h1>
+            <p class="public-hero-text">Teachers and class chiefs no longer need to rely on handwritten letters that may be delayed, misplaced, or difficult to track. Every request is recorded, reviewed, scheduled, and published through one simple digital process.</p>
+            <div class="public-actions"><a class="public-button public-button-primary" href="#todays-schedule">View Today's Schedule</a><a class="public-button public-button-secondary" href="#how-it-works">How It Works</a></div>
+            <p class="public-supporting-note">Public visitors can view approved daily sessions. Authorized users log in to submit and manage requests.</p>
+          </div>
+          <figure class="public-hero-figure">
+            <img src="{{ url_for('static', filename='images/smartclass-hero.webp') }}" alt="Students learning with digital equipment in a Smart Class environment" width="3840" height="3072" loading="eager" fetchpriority="high">
+            <figcaption>Smart Class learning environment at College Saint André.</figcaption>
+          </figure>
+        </div>
       </section>
-    {% endif %}{% endfor %}
-    {% if total.value == 0 %}<div class="empty-state"><h2 class="h5">No sessions today</h2><p class="mb-0">No Smart Class sessions are scheduled for today.</p></div>{% endif %}
-  </section>
-{% endblock %}
+
+      <section class="public-process-strip" aria-label="Smart Class request process summary">
+        <div class="container-xl public-process-grid">
+          <article><span>01</span><div><h2>Submit</h2><p>A Teacher or Class Monitor sends the request digitally.</p></div></article>
+          <article><span>02</span><div><h2>Join the queue</h2><p>The request is recorded and remains visible until review.</p></div></article>
+          <article><span>03</span><div><h2>Review and schedule</h2><p>The Patron or Matron selects an available room and prep.</p></div></article>
+          <article><span>04</span><div><h2>Notify and publish</h2><p>The requester is updated and approved sessions appear publicly.</p></div></article>
+        </div>
+      </section>
+
+      <section id="todays-schedule" class="public-section public-schedule-section" aria-labelledby="public-schedule-heading">
+        <div class="container-xl">
+          <div class="public-section-heading public-schedule-heading">
+            <div><p class="public-eyebrow">Public timetable</p><h2 id="public-schedule-heading">Today's Smart Class schedule</h2><p>Only approved sessions for the current day are visible publicly.</p></div>
+            <time datetime="{{ schedule_date.isoformat() }}">{{ schedule_date.strftime("%A, %d %B %Y") }}</time>
+          </div>
+          {% set total = namespace(value=0) %}
+          {% for prep, bookings in schedule.items() %}
+            {% set total.value = total.value + bookings|length %}
+            {% if bookings %}
+              <section class="public-schedule-panel" aria-labelledby="prep-{{ loop.index }}-heading">
+                <h3 id="prep-{{ loop.index }}-heading">{{ prep_labels[prep] }}</h3>
+                <div class="table-responsive"><table class="table public-schedule-table"><caption class="visually-hidden">{{ prep_labels[prep] }} Smart Class sessions for {{ schedule_date }}</caption><thead><tr><th scope="col">Room</th><th scope="col">Class</th><th scope="col">Teacher</th></tr></thead><tbody>
+                  {% for booking in bookings %}<tr><th scope="row">{{ booking.room_name }}</th><td>{{ booking.class_name }}</td><td>{{ booking.teacher_name }}</td></tr>{% endfor %}
+                </tbody></table></div>
+              </section>
+            {% endif %}
+          {% endfor %}
+          {% if total.value == 0 %}<div class="public-empty-state"><h3>No sessions scheduled today</h3><p>The Smart Classes are currently available. Check again later for schedule updates.</p></div>{% endif %}
+        </div>
+      </section>
+
+      <section class="public-section public-origin-section" aria-labelledby="origin-heading">
+        <div class="container-xl public-origin-grid">
+          <div><p class="public-eyebrow">Why the system was created</p><h2 id="origin-heading">A reliable path from request to timetable</h2></div>
+          <div class="public-origin-copy">
+            <p>Smart Class requests were previously delivered through handwritten letters. With no central record, it was difficult to confirm which requests had been received, reviewed, approved, or scheduled. A letter could be delayed, forgotten, or misplaced before reaching the final timetable.</p>
+            <p>The Smart Class Management System replaces that process with one organized digital workflow. Requests are recorded immediately, the Patron or Matron reviews them in one queue, and approved sessions are published clearly.</p>
+            <p class="public-highlight">The goal is simple: make every request visible, traceable, and easier to manage.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="public-section public-how-section" aria-labelledby="how-heading">
+        <div class="container-xl">
+          <div class="public-section-heading"><div><p class="public-eyebrow">How it works</p><h2 id="how-heading">Four clear stages</h2></div><p>Each request follows the same visible process from submission to a public approved timetable.</p></div>
+          <div class="public-stage-grid">
+            <article><span>1</span><h3>Submit</h3><p>A Teacher or Class Monitor enters the subject and private reason and sends the request.</p></article>
+            <article><span>2</span><h3>Join the queue</h3><p>The request is recorded immediately and remains visible until the scheduler reviews it.</p></article>
+            <article><span>3</span><h3>Review and schedule</h3><p>The Patron or Matron assigns an available date, prep, and Smart Class room.</p></article>
+            <article><span>4</span><h3>Notify and publish</h3><p>The requester receives an update, and the approved session appears on the public timetable.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="user-guide" class="public-section public-guide-section" aria-labelledby="guide-heading">
+        <div class="container-xl">
+          <div class="public-section-heading"><div><p class="public-eyebrow">User guide</p><h2 id="guide-heading">Clear responsibilities for every role</h2></div></div>
+          <div class="public-role-grid">
+            <article><h3>Teacher</h3><ul><li>Selects a class and enters the subject and private reason.</li><li>Receives high priority in the pending queue.</li><li>Can edit or cancel a request while it is pending.</li><li>Receives notifications when the request changes.</li></ul></article>
+            <article><h3>Class Monitor</h3><ul><li>Submits a request for the assigned class.</li><li>Selects the responsible Teacher.</li><li>Tracks pending and previous requests.</li><li>Receives updates after approval, rejection, or cancellation.</li></ul></article>
+            <article><h3>Patron or Matron</h3><ul><li>Reviews the organized pending queue.</li><li>Chooses the date, prep, and available room.</li><li>Rejects requests when necessary.</li><li>Blocks unavailable rooms, slots, or full days.</li></ul></article>
+            <article><h3>Administrator</h3><ul><li>Creates and manages user accounts.</li><li>Maintains classes and Smart Class rooms.</li><li>Reviews reports and audit history.</li><li>Can reschedule or cancel approved bookings.</li></ul></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="public-section public-comparison-section" aria-labelledby="comparison-heading">
+        <div class="container-xl">
+          <div class="public-section-heading"><div><p class="public-eyebrow">Before and now</p><h2 id="comparison-heading">One shared process replaces scattered letters</h2></div></div>
+          <div class="public-comparison-grid">
+            <article class="public-before"><p class="public-panel-label">Before</p><h3>Handwritten requests</h3><ul><li>Letters had to be delivered physically.</li><li>There was no shared record of pending requests.</li><li>Requesters could not easily confirm progress.</li><li>Scheduling conflicts required manual checking.</li><li>A misplaced letter could disappear from the process.</li></ul></article>
+            <article class="public-now"><p class="public-panel-label">Now</p><h3>One digital workflow</h3><ul><li>Requests are recorded immediately.</li><li>The pending queue is visible to the scheduler.</li><li>Users can review their request history.</li><li>The system checks room, class, and Teacher conflicts.</li><li>Approved sessions are published clearly each day.</li></ul></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="public-section public-faq-section" aria-labelledby="faq-heading">
+        <div class="container-xl public-faq-layout">
+          <div><p class="public-eyebrow">Frequently asked questions</p><h2 id="faq-heading">What requesters and visitors need to know</h2></div>
+          <div class="public-faq-list">
+            <details><summary>Can a requester choose the Smart Class room and prep?</summary><p>No. Teachers and Class Monitors submit the request without choosing a date, prep, or room. The Patron or Matron assigns those details during approval.</p></details>
+            <details><summary>What happens after a request is submitted?</summary><p>It enters the pending queue. Teacher requests receive high priority, and the Patron or Matron reviews each request before scheduling or rejection.</p></details>
+            <details><summary>Can the public see the private reason for a request?</summary><p>No. The public timetable shows only the prep, room, class, and Teacher for approved current-day sessions.</p></details>
+            <details><summary>What happens when a Smart Class is unavailable?</summary><p>The Patron or Matron or Administrator can block an exact slot, one room for a day, or the full day. A block cannot overwrite an existing scheduled booking.</p></details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="public-footer"><div class="container-xl public-footer-grid"><div><strong>Smart Class Management System</strong><span>College Saint André</span></div><p>Product design and development by INEZA Fidele</p><p>A digital solution for clearer Smart Class scheduling.</p></div></footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+  </body>
+</html>
