@@ -13,7 +13,8 @@
     <header class="public-header">
       <nav class="container-xl public-nav" aria-label="Public navigation">
         <a class="public-brand" href="{{ url_for('public.home') }}" aria-label="Smart Class Management System home">
-          <span>Smart Class Management System</span><small>College Saint André</small>
+          <img class="public-brand-logo" src="{{ url_for('static', filename='images/smartclass-logo.webp') }}" alt="Smart Class Management System logo" width="52" height="52">
+          <span class="public-brand-copy"><strong>Smart Class Management System</strong><small>College Saint André</small></span>
         </a>
         <div class="public-nav-actions">
           {% if current_user.is_authenticated %}
