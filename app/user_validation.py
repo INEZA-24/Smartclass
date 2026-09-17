@@ -4,7 +4,7 @@ import unicodedata
 
 USERNAME_MAX_LENGTH = 80
 FULL_NAME_MAX_LENGTH = 150
-MINIMUM_PASSWORD_LENGTH = 12
+MINIMUM_PASSWORD_LENGTH = 8
 
 
 def _reject_control_characters(value: str, label: str) -> None:
